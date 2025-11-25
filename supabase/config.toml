@@ -1,0 +1,13 @@
+project_id = "pnqtfuaoszopfykkwrft"
+
+[functions.generate-image]
+verify_jwt = true
+
+[functions.enhance-prompt]
+verify_jwt = false
+
+[functions.cleanup-abandoned-rooms]
+verify_jwt = false
+
+[functions.auto-end-abandoned-rooms]
+verify_jwt = false

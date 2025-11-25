@@ -1,0 +1,31 @@
+import JoinQRCode from './JoinQRCode';
+
+interface HostWaitingViewProps {
+  submittedCount: number;
+  totalPlayers: number;
+  roomCode: string;
+}
+
+export default function HostWaitingView({ submittedCount, totalPlayers, roomCode }: HostWaitingViewProps) {
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <JoinQRCode roomCode={roomCode} />
+      <div className="w-full max-w-2xl space-y-8 text-center">
+        <h1 className="text-5xl font-bold text-foreground">Waiting for Submissions</h1>
+        
+        <div className="border-4 border-border rounded-lg p-12 bg-card">
+          <p className="text-6xl font-bold text-primary mb-4">
+            {submittedCount}/{totalPlayers}
+          </p>
+          <p className="text-2xl text-muted-foreground">
+            Players submitted
+          </p>
+        </div>
+
+        <p className="text-xl text-muted-foreground">
+          Waiting for all players to submit their images...
+        </p>
+      </div>
+    </div>
+  );
+}
