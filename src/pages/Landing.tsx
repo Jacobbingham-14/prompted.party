@@ -56,7 +56,7 @@ const Landing = () => {
   const [mode, setMode] = useState<'marketing' | 'active-games' | 'create' | 'join'>('marketing');
   const [playerName, setPlayerName] = useState('');
   const [roomCode, setRoomCode] = useState('');
-  const [gameMode, setGameMode] = useState<'judge' | 'voting'>('judge');
+  const [gameMode, setGameMode] = useState<'judge' | 'voting' | 'forgery'>('judge');
   const [hostRooms, setHostRooms] = useState<Room[]>([]);
   const [suggestionDialogOpen, setSuggestionDialogOpen] = useState(false);
   const [suggestionForm, setSuggestionForm] = useState({ message: '' });
@@ -123,7 +123,7 @@ const Landing = () => {
     setMode('marketing');
   };
 
-  const handleCreateRoom = async (selectedGameMode: 'judge' | 'voting') => {
+  const handleCreateRoom = async (selectedGameMode: 'judge' | 'voting' | 'forgery') => {
     if (!user) {
       navigate('/auth');
       return;
@@ -557,12 +557,12 @@ const Landing = () => {
           <div className="max-w-2xl mx-auto space-y-6">
             <h1 className="text-4xl font-bold text-center mb-8">Select Game Mode</h1>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <Card
                 onClick={() => setGameMode('judge')}
                 className={`p-8 cursor-pointer transition-all hover:scale-105 ${
-                  gameMode === 'judge' 
-                    ? 'ring-4 ring-primary bg-primary/10' 
+                  gameMode === 'judge'
+                    ? 'ring-4 ring-primary bg-primary/10'
                     : 'hover:shadow-lg'
                 }`}
               >
@@ -578,26 +578,47 @@ const Landing = () => {
                   </ul>
                 </CardContent>
               </Card>
-              
+
               <Card
                 onClick={() => setGameMode('voting')}
                 className={`p-8 cursor-pointer transition-all hover:scale-105 ${
-                  gameMode === 'voting' 
-                    ? 'ring-4 ring-primary bg-primary/10' 
+                  gameMode === 'voting'
+                    ? 'ring-4 ring-primary bg-primary/10'
                     : 'hover:shadow-lg'
                 }`}
               >
                 <CardContent className="p-0 space-y-4">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-2xl">Voting Mode</h3>
-                    <Badge className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground animate-pulse">NEW!</Badge>
-                  </div>
+                  <h3 className="font-bold text-2xl">Voting Mode</h3>
                   <p className="text-muted-foreground">
                     All players vote for prompts and images. More democratic and engaging!
                   </p>
                   <ul className="text-sm text-muted-foreground space-y-1">
                     <li>• Everyone votes on prompts</li>
                     <li>• Everyone votes on images</li>
+                    <li>• Requires 3+ players</li>
+                  </ul>
+                </CardContent>
+              </Card>
+
+              <Card
+                onClick={() => setGameMode('forgery')}
+                className={`p-8 cursor-pointer transition-all hover:scale-105 ${
+                  gameMode === 'forgery'
+                    ? 'ring-4 ring-primary bg-primary/10'
+                    : 'hover:shadow-lg'
+                }`}
+              >
+                <CardContent className="p-0 space-y-4">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-2xl">Forgery Mode</h3>
+                    <Badge className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground animate-pulse">NEW!</Badge>
+                  </div>
+                  <p className="text-muted-foreground">
+                    Secret agents receive different prompts. Can you spot the forger?
+                  </p>
+                  <ul className="text-sm text-muted-foreground space-y-1">
+                    <li>• Secret prompt assignments</li>
+                    <li>• Vote to identify the forger</li>
                     <li>• Requires 3+ players</li>
                   </ul>
                 </CardContent>
@@ -617,7 +638,7 @@ const Landing = () => {
                 className="flex-1"
                 size="lg"
               >
-                Create {gameMode === 'judge' ? 'Judge' : 'Voting'} Game
+                Create {gameMode === 'judge' ? 'Judge' : gameMode === 'voting' ? 'Voting' : 'Forgery'} Game
               </Button>
             </div>
           </div>

@@ -14,6 +14,118 @@ export type Database = {
   }
   public: {
     Tables: {
+      forgery_prompts: {
+        Row: {
+          created_at: string | null
+          forger_prompt: string
+          id: string
+          main_prompt: string
+          set_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          forger_prompt: string
+          id?: string
+          main_prompt: string
+          set_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          forger_prompt?: string
+          id?: string
+          main_prompt?: string
+          set_id?: string | null
+        }
+        Relationships: []
+      }
+      forgery_votes: {
+        Row: {
+          accused_player_id: string
+          created_at: string | null
+          id: string
+          round_id: string
+          voter_id: string
+        }
+        Insert: {
+          accused_player_id: string
+          created_at?: string | null
+          id?: string
+          round_id: string
+          voter_id: string
+        }
+        Update: {
+          accused_player_id?: string
+          created_at?: string | null
+          id?: string
+          round_id?: string
+          voter_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "forgery_votes_round_id_fkey"
+            columns: ["round_id"]
+            isOneToOne: false
+            referencedRelation: "rounds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "forgery_votes_voter_id_fkey"
+            columns: ["voter_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "forgery_votes_accused_player_id_fkey"
+            columns: ["accused_player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      player_round_prompts: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_forger: boolean
+          player_id: string
+          prompt_text: string
+          round_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_forger?: boolean
+          player_id: string
+          prompt_text: string
+          round_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_forger?: boolean
+          player_id?: string
+          prompt_text?: string
+          round_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_round_prompts_round_id_fkey"
+            columns: ["round_id"]
+            isOneToOne: false
+            referencedRelation: "rounds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "player_round_prompts_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       custom_prompts: {
         Row: {
           created_at: string | null
@@ -128,6 +240,7 @@ export type Database = {
       }
       players: {
         Row: {
+          avatar_url: string | null
           created_at: string
           id: string
           is_judge: boolean
@@ -136,6 +249,7 @@ export type Database = {
           score: number
         }
         Insert: {
+          avatar_url?: string | null
           created_at?: string
           id?: string
           is_judge?: boolean
@@ -144,6 +258,7 @@ export type Database = {
           score?: number
         }
         Update: {
+          avatar_url?: string | null
           created_at?: string
           id?: string
           is_judge?: boolean
@@ -442,6 +557,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      assign_forgery_roles: {
+        Args: { p_round_id: string; p_room_id: string }
+        Returns: undefined
+      }
+      check_generation_limit: {
+        Args: { p_user_id: string }
+        Returns: {
+          allowed: boolean
+          current_count: number
+          max_limit: number
+          remaining: number
+        }[]
+      }
       delete_ended_room: {
         Args: { p_caller_id: string; p_room_id: string }
         Returns: undefined
@@ -478,6 +606,10 @@ export type Database = {
         Returns: undefined
       }
       refresh_host_stats: { Args: { p_host_id: string }; Returns: undefined }
+      update_player_avatar: {
+        Args: { p_avatar_url: string; p_player_id: string }
+        Returns: undefined
+      }
       set_round_judge: {
         Args: { p_caller_id: string; p_judge_id: string; p_room_id: string }
         Returns: undefined

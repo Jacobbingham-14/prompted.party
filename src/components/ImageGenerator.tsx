@@ -6,7 +6,6 @@ import {
   Send,
   RotateCw,
   Images,
-  Sparkles,
   Palette,
   Sun,
   Contrast,
@@ -17,8 +16,9 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
+import { useGenerationLimit } from "@/hooks/useGenerationLimit";
 
 interface GeneratedImage {
   url: string;
@@ -41,12 +41,12 @@ interface ImageGeneratorProps {
   onClose?: () => void;
   prompt?: string;
   roomId?: string;
+  hostId?: string;
 }
 
-export const ImageGenerator = ({ onImageReady, onClose, prompt: initialPrompt, roomId }: ImageGeneratorProps) => {
+export const ImageGenerator = ({ onImageReady, onClose, prompt: initialPrompt, roomId, hostId }: ImageGeneratorProps) => {
   const [prompt, setPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
-  const [isEnhancing, setIsEnhancing] = useState(false);
   const [isPreparingImage, setIsPreparingImage] = useState(false);
   const [conversation, setConversation] = useState<ConversationMessage[]>([]);
   const [currentSeed, setCurrentSeed] = useState<number | undefined>(undefined);
@@ -58,6 +58,7 @@ export const ImageGenerator = ({ onImageReady, onClose, prompt: initialPrompt, r
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const { allowed, currentCount, maxLimit, remaining, decrementLocally } = useGenerationLimit(hostId);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -76,34 +77,17 @@ export const ImageGenerator = ({ onImageReady, onClose, prompt: initialPrompt, r
     }
   }, [prompt]);
 
-  const enhancePrompt = async (userInput: string, context?: string): Promise<string> => {
-    try {
-      const { data, error } = await supabase.functions.invoke('enhance-prompt', {
-        body: { userInput, context },
-      });
-
-      if (error) {
-        console.error("Prompt enhancement failed:", error);
-        toast({
-          title: "Using original prompt",
-          description: "Enhancement unavailable, generating with your input directly",
-        });
-        return userInput;
-      }
-
-      const enhanced = (data as any)?.enhancedPrompt || userInput;
-      return enhanced;
-    } catch (error) {
-      console.error("Error enhancing prompt:", error);
-      toast({
-        title: "Using original prompt",
-        description: "Enhancement unavailable, generating with your input directly",
-      });
-      return userInput;
-    }
-  };
 
   const generateImage = async (finalPrompt: string, useRemix: boolean = false) => {
+    if (!allowed && hostId) {
+      toast({
+        title: "Generation limit reached",
+        description: `You've used all ${maxLimit} generations for this account.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsGenerating(true);
     setShowGenerateButton(false);
 
@@ -123,8 +107,19 @@ export const ImageGenerator = ({ onImageReady, onClose, prompt: initialPrompt, r
       });
 
       if (error) {
+        // Handle 429 limit exceeded from edge function
+        if (error.message?.includes('429') || (data as any)?.remaining === 0) {
+          toast({
+            title: "Generation limit reached",
+            description: `You've used all ${maxLimit} generations for this account.`,
+            variant: "destructive",
+          });
+          return;
+        }
         throw new Error(error.message || "Failed to generate image");
       }
+
+      decrementLocally();
 
       const imageUrl = Array.isArray((data as any).output) ? (data as any).output[0] : (data as any).output;
 
@@ -205,7 +200,7 @@ export const ImageGenerator = ({ onImageReady, onClose, prompt: initialPrompt, r
   };
 
   const handleSend = async () => {
-    if (!prompt.trim() || isGenerating || isEnhancing) return;
+    if (!prompt.trim() || isGenerating) return;
 
     const userMessage = prompt.trim();
 
@@ -283,15 +278,6 @@ export const ImageGenerator = ({ onImageReady, onClose, prompt: initialPrompt, r
     generateImage(pendingPrompt, isRemix);
   };
 
-  const handleEnhanceClick = async () => {
-    const current = prompt.trim();
-    if (!current || isGenerating || isEnhancing) return;
-    setIsEnhancing(true);
-    const enhanced = await enhancePrompt(current, fullPromptChain || undefined);
-    setIsEnhancing(false);
-    setPrompt(enhanced);
-    textareaRef.current?.focus();
-  };
 
   const handleStartOver = () => {
     setConversation([]);
@@ -533,16 +519,6 @@ export const ImageGenerator = ({ onImageReady, onClose, prompt: initialPrompt, r
                 </div>
               </div>
             ))}
-            {isEnhancing && (
-              <div className="flex justify-start">
-                <div className="bg-secondary text-secondary-foreground rounded-[20px] rounded-bl-sm px-4 py-3 shadow-sm">
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span className="text-sm">Enhancing prompt...</span>
-                  </div>
-                </div>
-              </div>
-            )}
             {isGenerating && (
               <div className="flex justify-start">
                 <div className="bg-secondary text-secondary-foreground rounded-[20px] rounded-bl-sm px-4 py-3 shadow-sm">
@@ -560,6 +536,23 @@ export const ImageGenerator = ({ onImageReady, onClose, prompt: initialPrompt, r
 
       <div className="border-t bg-card p-4 shrink-0 sticky bottom-0 z-10">
         <div className="max-w-4xl mx-auto">
+          {hostId && (
+            <div className="mb-3 space-y-1">
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>
+                  {remaining <= 10 && remaining > 0 && (
+                    <span className="text-yellow-600 font-medium">⚠ {remaining} generations remaining</span>
+                  )}
+                  {remaining === 0 && (
+                    <span className="text-destructive font-medium">Generation limit reached</span>
+                  )}
+                  {remaining > 10 && <span>{currentCount} / {maxLimit} generations used</span>}
+                </span>
+                <span>{remaining} left</span>
+              </div>
+              <Progress value={(currentCount / maxLimit) * 100} className="h-1" />
+            </div>
+          )}
           {showGenerateButton && !isGenerating && (
             <div className="mb-3 flex justify-center">
               <Button onClick={handleGenerate} size="lg" className="rounded-full px-8">
@@ -569,24 +562,6 @@ export const ImageGenerator = ({ onImageReady, onClose, prompt: initialPrompt, r
             </div>
           )}
           <div className="flex items-end gap-2">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    onClick={handleEnhanceClick}
-                    disabled={isGenerating || isEnhancing || !prompt.trim()}
-                    variant="secondary"
-                    size="icon"
-                    className="h-[44px] w-[44px] rounded-full shrink-0"
-                  >
-                    {isEnhancing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Enhance prompt</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
             <Textarea
               ref={textareaRef}
               placeholder={
@@ -600,12 +575,12 @@ export const ImageGenerator = ({ onImageReady, onClose, prompt: initialPrompt, r
               onChange={handleTextareaChange}
               onKeyDown={handleKeyPress}
               className="min-h-[60px] max-h-[240px] resize-none rounded-[22px] border-border bg-background px-4 py-3 text-[15px] leading-relaxed overflow-y-auto"
-              disabled={isGenerating || isEnhancing}
+              disabled={isGenerating}
               rows={2}
             />
             <Button
               onClick={handleSend}
-              disabled={isGenerating || isEnhancing || !prompt.trim()}
+              disabled={isGenerating || !prompt.trim() || !allowed}
               size="icon"
               className="h-[44px] w-[44px] rounded-full shrink-0"
             >

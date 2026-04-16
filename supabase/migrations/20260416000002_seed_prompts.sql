@@ -1,0 +1,58 @@
+-- ============================================================
+-- Replace placeholder prompts with real prompt library
+-- ============================================================
+
+-- Clear the 10 generic placeholder prompts
+DELETE FROM prompts;
+
+-- Insert the full prompt library (49 prompts)
+INSERT INTO prompts (text) VALUES
+  ('Rudolph''s day off'),
+  ('Christmas at your in-laws'),
+  ('What the wisemen actually brought'),
+  ('The best Christmas tradition'),
+  ('The true reason the Grinch stole Christmas'),
+  ('How Santa''s sleigh actually looks'),
+  ('A movie villain I''d fight as a superhero'),
+  ('A dentist''s worst nightmare'),
+  ('My battle mount'),
+  ('A restaurant I wouldn''t want to eat at'),
+  ('My next fever dream'),
+  ('My sidekick'),
+  ('A new olympic sport'),
+  ('A heated political debate'),
+  ('My worst fear'),
+  ('My first memory'),
+  ('My friend group described in a photo'),
+  ('How my father got to school'),
+  ('My reaction to seeing my crush'),
+  ('The worst thing that can happen on a date'),
+  ('My thoughts during a job interview'),
+  ('My pet''s secret double life'),
+  ('An award I deserve'),
+  ('Me as a movie hero'),
+  ('My dream vacation'),
+  ('How the world ends'),
+  ('My life in 5 years'),
+  ('Best way to spend a weekend'),
+  ('An advertisement for being my friend'),
+  ('A political campaign for an alien running for president'),
+  ('A movie poster of my life'),
+  ('The last thing I shared with my therapist'),
+  ('What the weird kid brought for show and tell'),
+  ('How my crush sees me'),
+  ('What really happens in area 51'),
+  ('Why I''d go to jail'),
+  ('My favorite hobby'),
+  ('What I look like after an all-nighter'),
+  ('A time I accidentally became famous'),
+  ('My teenage rebel phase'),
+  ('The ultimate sibling rivalry'),
+  ('How I''d survive a zombie apocalypse'),
+  ('The ultimate "parent-teacher conference" disaster'),
+  ('A "wanted" poster of myself'),
+  ('The Grinch''s worst Christmas'),
+  ('What the elves do while Santa delivers presents'),
+  ('The true meaning of Christmas'),
+  ('On the first day of Christmas my true love gave to me...'),
+  ('How Santa was discovered');

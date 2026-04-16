@@ -18,6 +18,11 @@ import HostImagePresentation from '@/components/HostImagePresentation';
 import ImageVoting from '@/components/ImageVoting';
 import HostImageVoting from '@/components/HostImageVoting';
 import WinnerReveal from '@/components/WinnerReveal';
+import GameEndedScreen from '@/components/GameEndedScreen';
+import ForgeryRoundStart from '@/components/ForgeryRoundStart';
+import ForgeryVoting from '@/components/ForgeryVoting';
+import HostForgeryVoting from '@/components/HostForgeryVoting';
+import ForgeryReveal from '@/components/ForgeryReveal';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -34,7 +39,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-type GameState = 'home' | 'select-room' | 'lobby' | 'round-start' | 'prompt-voting' | 'submitting' | 'presenting' | 'image-voting' | 'judging' | 'winner-reveal' | 'scoreboard';
+type GameState = 'home' | 'select-room' | 'lobby' | 'round-start' | 'prompt-voting' | 'submitting' | 'presenting' | 'image-voting' | 'judging' | 'winner-reveal' | 'scoreboard' | 'game-ended' | 'forgery-round-start' | 'forgery-voting' | 'forgery-reveal';
 
 interface Player {
   id: string;
@@ -42,6 +47,7 @@ interface Player {
   score: number;
   is_judge: boolean;
   room_id: string;
+  avatar_url?: string | null;
 }
 
 interface Room {
@@ -50,7 +56,12 @@ interface Room {
   status: string;
   host_id: string;
   created_at: string;
-  game_mode: 'judge' | 'voting';
+  game_mode: 'judge' | 'voting' | 'forgery';
+}
+
+interface ForgeryVote {
+  voter_id: string;
+  accused_player_id: string;
 }
 
 interface Round {
@@ -114,6 +125,12 @@ const Index = () => {
   const [isRevotingImages, setIsRevotingImages] = useState(false);
   const [tiedImageIds, setTiedImageIds] = useState<string[]>([]);
   const [showNoVotesAlert, setShowNoVotesAlert] = useState(false);
+  // Forgery mode state
+  const [forgeryVotes, setForgeryVotes] = useState<ForgeryVote[]>([]);
+  const [currentForgeryVote, setCurrentForgeryVote] = useState<string | null>(null);
+  const [forgeryForgerIds, setForgeryForgerIds] = useState<string[]>([]);
+  const [forgeryScoreChanges, setForgeryScoreChanges] = useState<Record<string, number>>({});
+  const [playerForgeryPrompt, setPlayerForgeryPrompt] = useState<string | null>(null);
   const { toast } = useToast();
 
   // NOTE: Client-side host check is for UI rendering only, NOT for authorization
@@ -386,7 +403,20 @@ const Index = () => {
 
     const playersChannel = supabase
       .channel('players-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'players', filter: `room_id=eq.${roomId}` }, 
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'players', filter: `room_id=eq.${roomId}` },
+        (payload) => {
+          // If the current player's own record was deleted, the host ended the game
+          if (payload.old?.id === playerId) {
+            setGameState('game-ended');
+          } else {
+            fetchPlayers();
+          }
+        }
+      )
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'players', filter: `room_id=eq.${roomId}` },
+        () => fetchPlayers()
+      )
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'players', filter: `room_id=eq.${roomId}` },
         () => fetchPlayers()
       )
       .subscribe();
@@ -483,6 +513,17 @@ const Index = () => {
         fetchSubmissions(currentRound.id);
       }
       setGameState('image-voting');
+    } else if (currentRound.status === 'forgery-prompt-assigned') {
+      setGameState('forgery-round-start');
+    } else if (currentRound.status === 'forgery-voting') {
+      fetchSubmissions(currentRound.id);
+      fetchForgeryVotes(currentRound.id);
+      setGameState('forgery-voting');
+    } else if (currentRound.status === 'forgery-reveal') {
+      fetchForgeryVotes(currentRound.id);
+      setGameState('forgery-reveal');
+    } else if (currentRound.status === 'complete' && room?.game_mode === 'forgery') {
+      setGameState('scoreboard');
     }
   }, [currentRound?.status]);
 
@@ -547,6 +588,51 @@ const Index = () => {
       supabase.removeChannel(channel);
     };
   }, [currentRound?.id, room?.game_mode]);
+
+  // Subscribe to forgery votes (forgery mode only)
+  useEffect(() => {
+    if (!currentRound?.id || room?.game_mode !== 'forgery') return;
+
+    fetchForgeryVotes(currentRound.id);
+
+    const channel = supabase
+      .channel(`forgery-votes-${currentRound.id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'forgery_votes',
+        filter: `round_id=eq.${currentRound.id}`
+      }, () => {
+        fetchForgeryVotes(currentRound.id);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentRound?.id, room?.game_mode]);
+
+  // Fetch forger IDs when entering reveal state (needed for all clients)
+  useEffect(() => {
+    if (gameState !== 'forgery-reveal' || !currentRound?.id) return;
+
+    const fetchForgerIds = async () => {
+      const { data } = await supabase
+        .from('player_round_prompts')
+        .select('player_id')
+        .eq('round_id', currentRound.id)
+        .eq('is_forger', true);
+      if (data) setForgeryForgerIds(data.map(r => r.player_id));
+    };
+
+    fetchForgerIds();
+  }, [gameState, currentRound?.id]);
+
+  // Fetch personal forgery prompt when submitting in forgery mode
+  useEffect(() => {
+    if (gameState !== 'submitting' || !currentRound?.id || room?.game_mode !== 'forgery' || isHost) return;
+    fetchPlayerForgeryPrompt(currentRound.id);
+  }, [gameState, currentRound?.id, room?.game_mode]);
 
   // Host listens for judge's prompt selection broadcast
   useEffect(() => {
@@ -709,11 +795,52 @@ const Index = () => {
     }
   };
 
+  const fetchForgeryVotes = async (roundId: string) => {
+    const { data } = await supabase
+      .from('forgery_votes')
+      .select('voter_id, accused_player_id')
+      .eq('round_id', roundId);
+    if (data) setForgeryVotes(data as ForgeryVote[]);
+  };
+
+  const fetchPlayerForgeryPrompt = async (roundId: string) => {
+    if (!playerId) return;
+    const { data } = await supabase
+      .from('player_round_prompts')
+      .select('prompt_text')
+      .eq('round_id', roundId)
+      .eq('player_id', playerId)
+      .maybeSingle();
+    if (data) setPlayerForgeryPrompt(data.prompt_text);
+  };
+
+  const computeForgeryScoreChanges = (forgerIds: string[], votes: ForgeryVote[]): Record<string, number> => {
+    const totalVotes = votes.length;
+    const voteCounts: Record<string, number> = {};
+    for (const vote of votes) {
+      voteCounts[vote.accused_player_id] = (voteCounts[vote.accused_player_id] || 0) + 1;
+    }
+    const forgerCaught = forgerIds.some(fid => (voteCounts[fid] || 0) > totalVotes / 2);
+    const scoreChanges: Record<string, number> = {};
+    if (forgerCaught) {
+      for (const vote of votes) {
+        if (forgerIds.includes(vote.accused_player_id)) {
+          scoreChanges[vote.voter_id] = (scoreChanges[vote.voter_id] || 0) + 1;
+        }
+      }
+    } else {
+      for (const fid of forgerIds) {
+        scoreChanges[fid] = (scoreChanges[fid] || 0) + 2;
+      }
+    }
+    return scoreChanges;
+  };
+
   const generateRoomCode = () => {
     return Math.random().toString(36).substring(2, 8).toUpperCase();
   };
 
-  const handleCreateRoom = async (gameMode: 'judge' | 'voting' = 'judge') => {
+  const handleCreateRoom = async (gameMode: 'judge' | 'voting' | 'forgery' = 'judge') => {
     if (!user?.id) {
       toast({ title: 'Authentication required', description: 'Please log in to host a game', variant: 'destructive' });
       return;
@@ -1235,6 +1362,36 @@ const Index = () => {
         setSubmissions([]);
         setGameState('round-start');
       }
+    } else if (room.game_mode === 'forgery') {
+      // FORGERY MODE: Create round + assign forgery roles
+      try {
+        const { data: roundData, error: roundError } = await supabase
+          .from('rounds')
+          .insert({ room_id: roomId, round_number: nextRoundNumber, judge_id: null, status: 'not_started' })
+          .select()
+          .single();
+
+        if (roundError) throw roundError;
+
+        const { error: assignError } = await supabase.rpc('assign_forgery_roles', {
+          p_round_id: roundData.id,
+          p_room_id: roomId
+        });
+
+        if (assignError) throw assignError;
+
+        setCurrentRound({ ...roundData, status: 'forgery-prompt-assigned' });
+        setSubmissions([]);
+        setForgeryVotes([]);
+        setCurrentForgeryVote(null);
+        setForgeryForgerIds([]);
+        setForgeryScoreChanges({});
+        setPlayerForgeryPrompt(null);
+        setGameState('forgery-round-start');
+      } catch (error: any) {
+        console.error('Error creating next forgery round:', error);
+        toast({ title: 'Error', description: getUserFriendlyErrorMessage(error), variant: 'destructive' });
+      }
     } else {
       // VOTING MODE: Fetch prompts for new round
       try {
@@ -1512,7 +1669,7 @@ const Index = () => {
     // The real-time subscriptions and state sync will handle the rest
   };
 
-  const handleCreateNewRoom = (gameMode: 'judge' | 'voting' = 'judge') => {
+  const handleCreateNewRoom = (gameMode: 'judge' | 'voting' | 'forgery' = 'judge') => {
     // Clear any old data
     localStorage.removeItem('hostRoomId');
     localStorage.removeItem('roomId');
@@ -1582,6 +1739,114 @@ const Index = () => {
       });
     }
   };
+
+  // ============= FORGERY MODE HANDLERS =============
+
+  const handleStartGameForgery = async () => {
+    if (!isHost || !roomId || !user) return;
+
+    if (players.length < 3) {
+      toast({
+        title: 'Not enough players',
+        description: 'Forgery mode requires at least 3 players',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    try {
+      // Create round
+      const { data: roundData, error: roundError } = await supabase
+        .from('rounds')
+        .insert({ room_id: roomId, round_number: 1, judge_id: null, status: 'not_started' })
+        .select()
+        .single();
+
+      if (roundError) throw roundError;
+
+      // Update room status
+      await supabase.from('rooms').update({ status: 'playing' }).eq('id', roomId);
+
+      // Assign forgery roles — also sets round status to 'forgery-prompt-assigned'
+      const { error: assignError } = await supabase.rpc('assign_forgery_roles', {
+        p_round_id: roundData.id,
+        p_room_id: roomId
+      });
+
+      if (assignError) throw assignError;
+
+      setCurrentRound({ ...roundData, status: 'forgery-prompt-assigned' });
+      setGameState('forgery-round-start');
+
+    } catch (error: any) {
+      console.error('Start forgery game error:', error);
+      toast({ title: 'Error', description: getUserFriendlyErrorMessage(error), variant: 'destructive' });
+    }
+  };
+
+  const handleForgeryVote = async (accusedPlayerId: string) => {
+    if (!playerId || !currentRound?.id) return;
+
+    setCurrentForgeryVote(accusedPlayerId);
+
+    try {
+      const { error } = await supabase
+        .from('forgery_votes')
+        .upsert({
+          round_id: currentRound.id,
+          voter_id: playerId,
+          accused_player_id: accusedPlayerId
+        }, { onConflict: 'round_id,voter_id' });
+
+      if (error) throw error;
+    } catch (error: any) {
+      console.error('Forgery vote error:', error);
+      toast({ title: 'Error', description: getUserFriendlyErrorMessage(error), variant: 'destructive' });
+    }
+  };
+
+  const handleEndForgeryVoting = async () => {
+    if (!isHost || !currentRound?.id) return;
+
+    try {
+      // Fetch forger IDs
+      const { data: promptData } = await supabase
+        .from('player_round_prompts')
+        .select('player_id')
+        .eq('round_id', currentRound.id)
+        .eq('is_forger', true);
+
+      const forgerIds = promptData?.map(r => r.player_id) || [];
+      setForgeryForgerIds(forgerIds);
+
+      // Compute score changes
+      const scoreChanges = computeForgeryScoreChanges(forgerIds, forgeryVotes);
+      setForgeryScoreChanges(scoreChanges);
+
+      // Apply score changes (increment_player_score adds 1 per call)
+      for (const [pid, delta] of Object.entries(scoreChanges)) {
+        for (let i = 0; i < delta; i++) {
+          await supabase.rpc('increment_player_score', {
+            p_player_id: pid,
+            p_round_id: currentRound.id
+          });
+        }
+      }
+
+      await fetchPlayers();
+
+      // Transition everyone to reveal via round status
+      await supabase.from('rounds').update({ status: 'forgery-reveal' }).eq('id', currentRound.id);
+
+      setGameState('forgery-reveal');
+
+    } catch (error: any) {
+      console.error('End forgery voting error:', error);
+      toast({ title: 'Error', description: getUserFriendlyErrorMessage(error), variant: 'destructive' });
+    }
+  };
+
+  // ============= END FORGERY MODE HANDLERS =============
 
   const handlePromptVote = async (promptText: string) => {
     if (!playerId || !currentRound?.id) return;
@@ -1940,7 +2205,11 @@ const Index = () => {
   }
 
   if (gameState === 'lobby') {
-    const startHandler = room?.game_mode === 'voting' ? handleStartGameVoting : handleStartGame;
+    const startHandler = room?.game_mode === 'voting'
+      ? handleStartGameVoting
+      : room?.game_mode === 'forgery'
+        ? handleStartGameForgery
+        : handleStartGame;
     return (
       <>
         {isHost && (
@@ -1953,7 +2222,19 @@ const Index = () => {
             End Game
           </Button>
         )}
-        <Lobby roomCode={roomCode} players={players} isHost={isHost} onStartGame={startHandler} onRemovePlayer={handleRemovePlayer} gameMode={room?.game_mode || 'judge'} />
+        <Lobby
+          roomCode={roomCode}
+          roomId={roomId}
+          players={players}
+          isHost={isHost}
+          currentPlayerId={playerId || undefined}
+          onStartGame={startHandler}
+          onRemovePlayer={handleRemovePlayer}
+          onAvatarUpdated={(pid, url) => {
+            setPlayers(prev => prev.map(p => p.id === pid ? { ...p, avatar_url: url } : p));
+          }}
+          gameMode={room?.game_mode || 'judge'}
+        />
       </>
     );
   }
@@ -2070,6 +2351,14 @@ const Index = () => {
     // Host sees image gallery with submission progress
     if (isHost) {
       const isVotingMode = room?.game_mode === 'voting';
+      const isForgeryModeHost = room?.game_mode === 'forgery';
+      const onStartHandler = isForgeryModeHost
+        ? async () => {
+            await supabase.from('rounds').update({ status: 'forgery-voting' }).eq('id', currentRound.id);
+          }
+        : isVotingMode
+          ? handleStartPresentation
+          : handleStartJudging;
       return (
         <>
           <Button
@@ -2087,7 +2376,7 @@ const Index = () => {
             roundId={currentRound.id}
             roomCode={roomCode}
             prompt={currentRound.prompt || undefined}
-            onStartJudging={isVotingMode ? handleStartPresentation : handleStartJudging}
+            onStartJudging={onStartHandler}
             onEndGame={handleEndGame}
           />
         </>
@@ -2105,13 +2394,19 @@ const Index = () => {
     }
     
     // Non-host, non-judge players submit images
+    const isForgeryMode = room?.game_mode === 'forgery';
+    const promptToShow = isForgeryMode
+      ? (playerForgeryPrompt || currentRound.prompt || '')
+      : (currentRound.prompt || '');
+
     return (
       <ImageSubmission
         onSubmit={handleImageSubmit}
         playersSubmitted={submittedCount}
         totalPlayers={totalSubmitters}
-        prompt={currentRound.prompt || ''}
+        prompt={promptToShow}
         roomId={roomId}
+        hostId={room?.host_id || undefined}
       />
     );
   }
@@ -2251,6 +2546,20 @@ const Index = () => {
         />
       );
     }
+
+    if (room?.game_mode === 'forgery') {
+      return (
+        <Scoreboard
+          players={players}
+          winnerIds={forgeryForgerIds}
+          prompt={currentRound.prompt || ''}
+          gameMode="voting"
+          isHost={isHost}
+          onNextRound={handleNextRound}
+          onEndGame={handleEndGame}
+        />
+      );
+    }
     
     const winningSubmission = submissions.find(s => s.is_winner);
     const winner = winningSubmission ? players.find(p => p.id === winningSubmission.player_id) : null;
@@ -2268,6 +2577,86 @@ const Index = () => {
         onEndGame={handleEndGame}
       />
     );
+  }
+
+  if (gameState === 'forgery-round-start' && currentRound) {
+    return (
+      <>
+        {isHost && (
+          <Button onClick={handleEndGame} variant="destructive" size="sm" className="fixed top-4 left-4 z-50 shadow-lg">
+            End Game
+          </Button>
+        )}
+        <ForgeryRoundStart
+          roundId={currentRound.id}
+          playerId={playerId}
+          isHost={isHost}
+          playerCount={players.length}
+          roundNumber={currentRound.round_number}
+          onHostStart={async () => {
+            await supabase.from('rounds').update({ status: 'submitting' }).eq('id', currentRound.id);
+          }}
+        />
+      </>
+    );
+  }
+
+  if (gameState === 'forgery-voting' && currentRound) {
+    if (isHost) {
+      return (
+        <>
+          <Button onClick={handleEndGame} variant="destructive" size="sm" className="fixed top-4 left-4 z-50 shadow-lg">
+            End Game
+          </Button>
+          <HostForgeryVoting
+            players={players}
+            votes={forgeryVotes}
+            onEndVoting={handleEndForgeryVoting}
+          />
+        </>
+      );
+    }
+    return (
+      <ForgeryVoting
+        players={players}
+        submissions={submissions}
+        currentPlayerId={playerId}
+        currentVote={currentForgeryVote}
+        onVote={handleForgeryVote}
+      />
+    );
+  }
+
+  if (gameState === 'forgery-reveal' && currentRound) {
+    const revealScoreChanges = Object.keys(forgeryScoreChanges).length > 0
+      ? forgeryScoreChanges
+      : computeForgeryScoreChanges(forgeryForgerIds, forgeryVotes);
+
+    return (
+      <ForgeryReveal
+        players={players}
+        forgerIds={forgeryForgerIds}
+        votes={forgeryVotes}
+        mainPrompt={currentRound.prompt || ''}
+        forgerPrompt={currentRound.selected_prompts?.[1] || ''}
+        scoreChanges={revealScoreChanges}
+        isHost={isHost}
+        onContinue={async () => {
+          if (isHost) {
+            await supabase.from('rounds').update({ status: 'complete' }).eq('id', currentRound.id);
+          }
+          setGameState('scoreboard');
+        }}
+      />
+    );
+  }
+
+  if (gameState === 'game-ended') {
+    const handleLeave = () => {
+      localStorage.clear();
+      navigate('/');
+    };
+    return <GameEndedScreen players={players} onLeave={handleLeave} />;
   }
 
   return (

@@ -10,9 +10,10 @@ interface ImageSubmissionProps {
   totalPlayers: number;
   prompt: string;
   roomId: string;
+  hostId?: string;
 }
 
-export default function ImageSubmission({ onSubmit, playersSubmitted, totalPlayers, prompt, roomId }: ImageSubmissionProps) {
+export default function ImageSubmission({ onSubmit, playersSubmitted, totalPlayers, prompt, roomId, hostId }: ImageSubmissionProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
@@ -85,6 +86,7 @@ export default function ImageSubmission({ onSubmit, playersSubmitted, totalPlaye
             onClose={() => {}}
             prompt={prompt}
             roomId={roomId}
+            hostId={hostId}
           />
         </div>
       ) : (

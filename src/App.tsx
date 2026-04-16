@@ -8,6 +8,8 @@ import Landing from "./pages/Landing";
 import Index from "./pages/Index";
 import Join from "./pages/Join";
 import Auth from "./pages/Auth";
+import AuthCallback from "./pages/AuthCallback";
+import ResetPassword from "./pages/ResetPassword";
 import PromptsManager from "./pages/PromptsManager";
 import NotFound from "./pages/NotFound";
 
@@ -26,6 +28,8 @@ const App = () => (
           <Route path="/play" element={<Index />} />
           <Route path="/join" element={<Join />} />
           <Route path="/auth" element={<Auth />} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/prompts-manager" element={<PromptsManager />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

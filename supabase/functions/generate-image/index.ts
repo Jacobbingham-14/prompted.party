@@ -15,42 +15,72 @@ serve(async (req) => {
   try {
     const black_forest_labs_flux_schnell = Deno.env.get('black_forest_labs_flux_schnell')
     if (!black_forest_labs_flux_schnell) {
-      console.error('black_forest_labs_flux_schnell is not set')
       throw new Error('black_forest_labs_flux_schnell is not configured')
     }
 
-    const replicate = new Replicate({
-      auth: black_forest_labs_flux_schnell,
-    })
-
     const body = await req.json()
-    console.log("Request body:", body)
 
     if (!body.prompt || typeof body.prompt !== 'string') {
       return new Response(
-        JSON.stringify({ 
-          error: "Missing required field: prompt is required" 
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 400,
-        }
+        JSON.stringify({ error: "Missing required field: prompt is required" }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       )
     }
 
     if (body.prompt.length > 500) {
       return new Response(
-        JSON.stringify({ 
-          error: "Prompt too long (max 500 characters)" 
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 400,
-        }
+        JSON.stringify({ error: "Prompt too long (max 500 characters)" }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       )
     }
 
-    console.log("Generating image with Flux Schnell, prompt:", body.prompt, "seed:", body.seed || "random")
-    
-    const input: any = {
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
+
+    let hostId: string | null = null
+    let remaining: number | null = null
+
+    // Look up host and check generation limit BEFORE calling Replicate
+    if (body.roomId) {
+      const { data: room } = await supabaseAdmin
+        .from('rooms')
+        .select('host_id')
+        .eq('id', body.roomId)
+        .single()
+
+      hostId = room?.host_id ?? null
+
+      if (hostId) {
+        const { data: limitData, error: limitError } = await supabaseAdmin.rpc('check_generation_limit', {
+          p_user_id: hostId
+        })
+
+        if (limitError) {
+          console.error('Limit check error:', limitError)
+        } else {
+          const limit = Array.isArray(limitData) ? limitData[0] : limitData
+          if (limit && !limit.allowed) {
+            return new Response(
+              JSON.stringify({
+                error: 'Generation limit reached',
+                message: `You have used all ${limit.max_limit} generations for this account.`,
+                limit: limit.max_limit,
+                used: limit.current_count,
+                remaining: 0,
+              }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 429 }
+            )
+          }
+          remaining = limit ? Math.max(0, limit.remaining - 1) : null
+        }
+      }
+    }
+
+    const replicate = new Replicate({ auth: black_forest_labs_flux_schnell })
+
+    const input: Record<string, unknown> = {
       prompt: body.prompt,
       go_fast: true,
       megapixels: "1",
@@ -58,65 +88,34 @@ serve(async (req) => {
       aspect_ratio: "1:1",
       output_format: "webp",
       output_quality: 80,
-      num_inference_steps: 4
+      num_inference_steps: 4,
     }
 
-    // Add seed if provided for consistency
     if (body.seed !== undefined && body.seed !== null) {
       input.seed = body.seed
     }
 
-    const output = await replicate.run(
-      "black-forest-labs/flux-schnell",
-      { input }
-    )
+    const output = await replicate.run("black-forest-labs/flux-schnell", { input })
 
-    console.log("Generation successful:", output)
-    
-    // Increment the host's generation counter if roomId is provided
-    if (body.roomId) {
-      try {
-        const supabaseAdmin = createClient(
-          Deno.env.get('SUPABASE_URL') ?? '',
-          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-        )
-
-        // Get the host_id from the room
-        const { data: room } = await supabaseAdmin
-          .from('rooms')
-          .select('host_id')
-          .eq('id', body.roomId)
-          .single()
-
-        if (room?.host_id) {
-          // Use the increment function
-          const { error: statsError } = await supabaseAdmin.rpc('increment_generation_count', {
-            p_user_id: room.host_id
-          })
-          
-          if (statsError) {
-            console.error('Failed to update generation stats:', statsError)
-          } else {
-            console.log('Successfully incremented generation count for host:', room.host_id)
-          }
-        }
-      } catch (statsError) {
-        // Log but don't fail the request
-        console.error('Error updating generation stats:', statsError)
+    // Increment counter after successful generation
+    if (hostId) {
+      const { error: statsError } = await supabaseAdmin.rpc('increment_generation_count', {
+        p_user_id: hostId
+      })
+      if (statsError) {
+        console.error('Failed to increment generation count:', statsError)
       }
     }
-    
-    return new Response(JSON.stringify({ output }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
-    })
+
+    return new Response(
+      JSON.stringify({ output, remaining }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+    )
   } catch (error) {
     console.error("Error in generate-image function:", error)
-    return new Response(JSON.stringify({ 
-      error: error instanceof Error ? error.message : 'Unknown error occurred' 
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500,
-    })
+    return new Response(
+      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error occurred' }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+    )
   }
 })

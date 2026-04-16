@@ -1,23 +1,29 @@
 import { Button } from '@/components/ui/button';
 import { QRCodeCanvas } from 'qrcode.react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { PlayerAvatar } from '@/components/PlayerAvatar';
+import { AvatarCreator } from '@/components/AvatarCreator';
 
 interface Player {
   id: string;
   name: string;
   score: number;
+  avatar_url?: string | null;
 }
 
 interface LobbyProps {
   roomCode: string;
+  roomId: string;
   players: Player[];
   isHost: boolean;
+  currentPlayerId?: string;
   onStartGame: () => void;
   onRemovePlayer?: (playerId: string) => void;
+  onAvatarUpdated?: (playerId: string, url: string) => void;
   gameMode: 'judge' | 'voting';
 }
 
-export default function Lobby({ roomCode, players, isHost, onStartGame, onRemovePlayer, gameMode }: LobbyProps) {
+export default function Lobby({ roomCode, roomId, players, isHost, currentPlayerId, onStartGame, onRemovePlayer, onAvatarUpdated, gameMode }: LobbyProps) {
   const [origin, setOrigin] = useState<string>('');
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -171,19 +177,31 @@ export default function Lobby({ roomCode, players, isHost, onStartGame, onRemove
             {players.map((player) => (
               <div
                 key={player.id}
-                className="p-3 border border-border rounded bg-muted text-base text-muted-foreground flex justify-between items-center"
+                className="p-3 border border-border rounded bg-muted text-base text-muted-foreground flex justify-between items-center gap-2"
               >
-                <span>{player.name}</span>
-                {isHost && onRemovePlayer && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onRemovePlayer(player.id)}
-                    className="text-destructive hover:text-destructive"
-                  >
-                    Remove
-                  </Button>
-                )}
+                <div className="flex items-center gap-2 min-w-0">
+                  <PlayerAvatar name={player.name} avatarUrl={player.avatar_url} size="sm" />
+                  <span className="truncate">{player.name}</span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {currentPlayerId === player.id && !isHost && onAvatarUpdated && (
+                    <AvatarCreator
+                      playerId={player.id}
+                      roomId={roomId}
+                      onAvatarSaved={(url) => onAvatarUpdated(player.id, url)}
+                    />
+                  )}
+                  {isHost && onRemovePlayer && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onRemovePlayer(player.id)}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      Remove
+                    </Button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
