@@ -92,6 +92,8 @@ const Landing = () => {
     const urlMode = searchParams.get('mode');
     if (urlMode === 'host' && user) {
       setMode('create');
+      // Clean up the URL param so refresh doesn't force create mode
+      navigate('/', { replace: true });
     } else if (urlMode === 'join') {
       setMode('join');
     } else if (user && hostRooms.length > 0) {
@@ -470,7 +472,7 @@ const Landing = () => {
               </Button>
             )}
             {mode === 'marketing' && (
-              <Button onClick={() => setMode('create')}>
+              <Button onClick={() => user ? setMode('create') : navigate('/auth?next=host')}>
                 Get Started <ArrowRight className="ml-2 w-4 h-4" />
               </Button>
             )}
@@ -524,8 +526,8 @@ const Landing = () => {
               ))}
             </div>
             
-            <Button 
-              onClick={() => setMode('create')}
+            <Button
+              onClick={() => user ? setMode('create') : navigate('/auth?next=host')}
               className="w-full"
               variant="default"
             >
@@ -712,7 +714,7 @@ const Landing = () => {
                 A multiplayer party game where <span className="text-primary font-semibold">creativity meets AI</span>. Players use AI to create images based on creative prompts, then vote on the best submissions to earn points.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
-                <Button size="lg" onClick={() => user ? setMode('create') : navigate('/auth')} className="text-lg">
+                <Button size="lg" onClick={() => user ? setMode('create') : navigate('/auth?next=host')} className="text-lg">
                   <Users className="mr-2 w-5 h-5" />
                   Host a Game
                 </Button>
@@ -977,7 +979,7 @@ const Landing = () => {
                     <Button
                       size="lg"
                       variant="secondary"
-                      onClick={() => user ? setMode('create') : navigate('/auth')}
+                      onClick={() => user ? setMode('create') : navigate('/auth?next=host')}
                       className="text-lg"
                     >
                       <Users className="mr-2 w-5 h-5" />

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,6 +21,13 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  const getRedirectPath = () => {
+    const next = searchParams.get('next');
+    if (next === 'host') return '/?mode=host';
+    return '/';
+  };
 
   useEffect(() => {
     // Check if already logged in
@@ -29,7 +36,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
         if (onAuthSuccess) {
           onAuthSuccess(session.user);
         }
-        navigate('/');
+        navigate(getRedirectPath());
       }
     });
 
@@ -74,7 +81,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
           if (onAuthSuccess) {
             onAuthSuccess(data.user);
           }
-          navigate('/');
+          navigate(getRedirectPath());
         }
       }
     } catch (error: any) {
