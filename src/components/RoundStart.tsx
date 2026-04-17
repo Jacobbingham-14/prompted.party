@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Sparkles } from 'lucide-react';
+import { Loader2, Sparkles, CheckCircle2 } from 'lucide-react';
 import { RealtimeChannel } from '@supabase/supabase-js';
 
 interface RoundStartProps {
@@ -22,6 +22,7 @@ interface Prompt {
 export default function RoundStart({ roundNumber, judgeName, isJudge, roomId, roundId, onContinue }: RoundStartProps) {
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [selectedPromptId, setSelectedPromptId] = useState<string | null>(null);
+  const [selectedPromptText, setSelectedPromptText] = useState<string | null>(null);
   const [customPrompt, setCustomPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const channelRef = useRef<RealtimeChannel | null>(null);
@@ -89,7 +90,8 @@ export default function RoundStart({ roundNumber, judgeName, isJudge, roomId, ro
 
   const handleSelectPrompt = (promptId: string, promptText: string) => {
     setSelectedPromptId(promptId);
-    
+    setSelectedPromptText(promptText);
+
     // Judge broadcasts their selection to the host
     if (channelRef.current) {
       channelRef.current.send({
@@ -98,14 +100,15 @@ export default function RoundStart({ roundNumber, judgeName, isJudge, roomId, ro
         payload: { prompt: promptText }
       });
     }
-    
-    // Update local UI immediately
+
     onContinue(promptText);
   };
 
   const handleSelectCustom = async () => {
     const trimmed = customPrompt.trim();
     if (trimmed && trimmed.length <= 200) {
+      setSelectedPromptText(trimmed);
+
       // Save custom prompt to database for admin review (background operation)
       try {
         await supabase.from('custom_prompts').insert({
@@ -116,7 +119,6 @@ export default function RoundStart({ roundNumber, judgeName, isJudge, roomId, ro
         });
       } catch (error) {
         console.error('Failed to save custom prompt:', error);
-        // Don't block gameplay if this fails
       }
 
       // Judge broadcasts their selection to the host
@@ -127,8 +129,7 @@ export default function RoundStart({ roundNumber, judgeName, isJudge, roomId, ro
           payload: { prompt: trimmed }
         });
       }
-      
-      // Update local UI immediately
+
       onContinue(trimmed);
     }
   };
@@ -150,6 +151,26 @@ export default function RoundStart({ roundNumber, judgeName, isJudge, roomId, ro
               Judge is selecting the prompt...
             </p>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show confirmation screen after judge selects a prompt
+  if (selectedPromptText) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="w-full max-w-md text-center space-y-6">
+          <h1 className="text-5xl font-bold text-foreground">Round {roundNumber}</h1>
+          <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto" />
+          <div className="space-y-2">
+            <p className="text-2xl font-semibold text-foreground">Prompt selected!</p>
+            <div className="rounded-xl border-2 border-green-500 bg-green-500/10 p-4 mt-4">
+              <p className="text-lg font-medium text-foreground">{selectedPromptText}</p>
+            </div>
+          </div>
+          <p className="text-muted-foreground">Waiting for players to start submitting…</p>
+          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground mx-auto" />
         </div>
       </div>
     );
