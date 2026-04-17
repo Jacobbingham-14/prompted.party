@@ -1,42 +1,31 @@
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
-import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { getUserFriendlyErrorMessage, logErrorInDev } from "@/lib/errorUtils";
-import {
-  Sparkles,
-  Users,
-  Trophy,
-  QrCode,
-  Zap,
-  Palette,
-  PartyPopper,
-  Briefcase,
-  Coffee,
-  GamepadIcon,
-  Wifi,
-  ArrowRight,
-  Check,
-  ChevronDown,
-  Mail,
-} from "lucide-react";
-import { validateSuggestionForm } from "@/lib/validation";
+import { ArrowRight, PlayCircle } from "lucide-react";
+
+// ─────────────────────────────────────────────
+// Gallery Data
+// ─────────────────────────────────────────────
+
+const GALLERY_ITEMS = [
+  { gradient: "from-violet-400 via-purple-500 to-pink-500",  emoji: "🦝", caption: "A raccoon running a startup",            prompt: "My sidekick",                       rotation: "-rotate-1" },
+  { gradient: "from-emerald-400 via-teal-500 to-cyan-500",   emoji: "🦷", caption: "A dentist's worst nightmare",            prompt: "A dentist's worst nightmare",       rotation: "rotate-1"  },
+  { gradient: "from-amber-400 via-orange-500 to-red-500",    emoji: "🧌", caption: "Shrek as a luxury perfume ad",           prompt: "My dream vacation",                 rotation: "-rotate-2" },
+  { gradient: "from-blue-400 via-indigo-500 to-violet-500",  emoji: "👽", caption: "Area 51 gift shop",                     prompt: "What really happens in area 51",    rotation: "rotate-2"  },
+  { gradient: "from-pink-400 via-rose-500 to-red-500",       emoji: "😾", caption: "A heated political debate (between cats)", prompt: "A heated political debate",       rotation: "rotate-1"  },
+  { gradient: "from-lime-400 via-green-500 to-emerald-500",  emoji: "🏆", caption: "An award I definitely deserve",          prompt: "An award I deserve",               rotation: "-rotate-1" },
+  { gradient: "from-cyan-400 via-sky-500 to-blue-500",       emoji: "🚀", caption: "How my father got to school",            prompt: "How my father got to school",      rotation: "rotate-2"  },
+  { gradient: "from-fuchsia-400 via-purple-500 to-indigo-500", emoji: "🧙", caption: "Me as a movie hero",                  prompt: "Me as a movie hero",               rotation: "-rotate-2" },
+];
+
+// ─────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────
 
 interface Room {
   id: string;
@@ -44,76 +33,70 @@ interface Room {
   status: string;
   created_at: string;
   host_id: string;
+  game_mode?: string;
 }
+
+type PageMode = "marketing" | "create" | "join" | "active-games";
+
+// ─────────────────────────────────────────────
+// Component
+// ─────────────────────────────────────────────
 
 const Landing = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
+
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [mode, setMode] = useState<'marketing' | 'active-games' | 'create' | 'join'>('marketing');
-  const [playerName, setPlayerName] = useState('');
-  const [roomCode, setRoomCode] = useState('');
-  const [gameMode, setGameMode] = useState<'judge' | 'voting' | 'forgery'>('judge');
+  const [mode, setMode] = useState<PageMode>("marketing");
+  const [playerName, setPlayerName] = useState("");
+  const [roomCode, setRoomCode] = useState("");
   const [hostRooms, setHostRooms] = useState<Room[]>([]);
-  const [suggestionDialogOpen, setSuggestionDialogOpen] = useState(false);
-  const [suggestionForm, setSuggestionForm] = useState({ message: '' });
-  const [isSubmittingSuggestion, setIsSubmittingSuggestion] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
 
-  // Handle QR code join
+  // Auth listener
   useEffect(() => {
-    const codeFromUrl = searchParams.get('code');
-    if (codeFromUrl) {
-      setRoomCode(codeFromUrl.toUpperCase());
-      setMode('join');
-    }
-  }, [searchParams]);
-
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-      }
-    );
-
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      if (session?.user) fetchHostRooms(session.user.id);
+    });
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
+      if (session?.user) fetchHostRooms(session.user.id);
     });
-
     return () => subscription.unsubscribe();
   }, []);
 
-  // Determine initial mode based on URL params and login status
+  // URL param handling
   useEffect(() => {
-    const urlMode = searchParams.get('mode');
-    if (urlMode === 'host' && user) {
-      setMode('create');
-      // Clean up the URL param so refresh doesn't force create mode
-      navigate('/', { replace: true });
-    } else if (urlMode === 'join') {
-      setMode('join');
-    } else if (user && hostRooms.length > 0) {
-      setMode('active-games');
-    } else {
-      setMode('marketing');
+    const codeFromUrl = searchParams.get("code");
+    if (codeFromUrl) {
+      setRoomCode(codeFromUrl.toUpperCase());
+      setMode("join");
     }
-  }, [searchParams, user, hostRooms.length]);
+    const urlMode = searchParams.get("mode");
+    if (urlMode === "host" && user) {
+      setMode("create");
+      navigate("/", { replace: true });
+    } else if (urlMode === "join") {
+      setMode("join");
+    }
+  }, [searchParams, user]);
 
-  // Fetch active host rooms
   const fetchHostRooms = async (userId: string) => {
-    const { data, error } = await supabase
-      .from('rooms')
-      .select('*')
-      .eq('user_id', userId)
-      .in('status', ['waiting', 'playing'])
-      .order('created_at', { ascending: false });
-    
+    const { data } = await supabase
+      .from("rooms")
+      .select("*")
+      .eq("user_id", userId)
+      .in("status", ["waiting", "playing"])
+      .order("created_at", { ascending: false });
     if (data) {
       setHostRooms(data as Room[]);
+      if (data.length > 0 && mode === "marketing") setMode("active-games");
     }
   };
 
@@ -122,911 +105,412 @@ const Landing = () => {
     setUser(null);
     setSession(null);
     setHostRooms([]);
-    setMode('marketing');
+    setMode("marketing");
   };
 
-  const handleCreateRoom = async (selectedGameMode: 'judge' | 'voting' | 'forgery') => {
-    if (!user) {
-      navigate('/auth');
-      return;
-    }
-
+  const handleCreateRoom = async (selectedGameMode: "judge" | "voting" | "forgery") => {
+    if (!user) { navigate("/auth?next=host"); return; }
+    setIsCreating(true);
     try {
       const code = Math.random().toString(36).substring(2, 8).toUpperCase();
       const { data, error } = await supabase
-        .from('rooms')
-        .insert({
-          code,
-          host_id: user.id,
-          user_id: user.id,
-          status: 'waiting',
-          game_mode: selectedGameMode
-        })
-        .select()
-        .single();
-
+        .from("rooms")
+        .insert({ code, host_id: user.id, user_id: user.id, status: "waiting", game_mode: selectedGameMode })
+        .select().single();
       if (error) throw error;
-
-      localStorage.setItem('hostRoomId', data.id);
-      navigate(`/play?mode=host`);
+      localStorage.setItem("hostRoomId", data.id);
+      navigate("/play?mode=host");
     } catch (error) {
-      logErrorInDev('Create room error', error);
-      toast({
-        title: 'Error',
-        description: getUserFriendlyErrorMessage(error),
-        variant: 'destructive'
-      });
+      logErrorInDev("Create room error", error);
+      toast({ title: "Error", description: getUserFriendlyErrorMessage(error), variant: "destructive" });
+    } finally {
+      setIsCreating(false);
     }
   };
 
-  const handleJoinRoom = async (name: string, code: string) => {
-    if (!name.trim() || !code.trim()) return;
-
+  const handleJoinRoom = async () => {
+    if (!playerName.trim() || !roomCode.trim()) return;
+    setIsJoining(true);
     try {
-      const { data: roomRows } = await supabase.rpc('find_room_by_code', {
-        room_code: code.toUpperCase()
-      });
+      const { data: roomRows } = await supabase.rpc("find_room_by_code", { room_code: roomCode.toUpperCase() });
       const room = Array.isArray(roomRows) ? roomRows[0] : roomRows;
-
-      if (!room) {
-        toast({
-          title: 'Error',
-          description: 'Room not found',
-          variant: 'destructive'
-        });
-        return;
-      }
-
-      if (room.status !== 'waiting' && room.status !== 'playing') {
-        toast({
-          title: 'Error',
-          description: 'This room is no longer active',
-          variant: 'destructive'
-        });
-        return;
-      }
+      if (!room) { toast({ title: "Room not found", description: "Check the code and try again", variant: "destructive" }); return; }
+      if (room.status !== "waiting" && room.status !== "playing") { toast({ title: "Room closed", description: "This room is no longer active", variant: "destructive" }); return; }
 
       const { data: player, error } = await supabase
-        .from('players')
-        .insert({
-          room_id: room.id,
-          name: name.trim(),
-          score: 0
-        })
-        .select()
-        .single();
-
+        .from("players")
+        .insert({ room_id: room.id, name: playerName.trim(), score: 0 })
+        .select().single();
       if (error) throw error;
 
-      const codeUpper = code.toUpperCase();
-      
-      // Store session data using separate keys (matching Join.tsx standard)
-      localStorage.setItem('playerId', player.id);
-      localStorage.setItem('roomId', room.id);
-      localStorage.setItem('roomCode', codeUpper);
-
-      // Navigate to game with state to avoid race condition
-      navigate('/play', {
-        state: {
-          playerId: player.id,
-          roomId: room.id,
-          roomCode: codeUpper
-        }
-      });
+      const codeUpper = roomCode.toUpperCase();
+      localStorage.setItem("playerId", player.id);
+      localStorage.setItem("roomId", room.id);
+      localStorage.setItem("roomCode", codeUpper);
+      navigate("/play", { state: { playerId: player.id, roomId: room.id, roomCode: codeUpper } });
     } catch (error) {
-      logErrorInDev('Join room error', error);
-      toast({
-        title: 'Error',
-        description: getUserFriendlyErrorMessage(error),
-        variant: 'destructive'
-      });
+      logErrorInDev("Join room error", error);
+      toast({ title: "Error", description: getUserFriendlyErrorMessage(error), variant: "destructive" });
+    } finally {
+      setIsJoining(false);
     }
-  };
-
-  const handleContinueRoom = (roomId: string) => {
-    localStorage.setItem('hostRoomId', roomId);
-    navigate('/play?mode=host');
   };
 
   const handleEndRoom = async (roomId: string) => {
     if (!user) return;
-
-    try {
-      const { error } = await supabase.rpc('delete_ended_room', {
-        p_room_id: roomId,
-        p_caller_id: user.id
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: 'Success',
-        description: 'Room ended successfully'
-      });
-
-      fetchHostRooms(user.id);
-    } catch (error) {
-      logErrorInDev('End room error', error);
-      toast({
-        title: 'Error',
-        description: getUserFriendlyErrorMessage(error),
-        variant: 'destructive'
-      });
-    }
+    await supabase.rpc("delete_ended_room", { p_room_id: roomId, p_caller_id: user.id });
+    fetchHostRooms(user.id);
   };
 
-  const handleSuggestionSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Double-check user is logged in
-    if (!user) {
-      toast({
-        title: "Login required",
-        description: "Please log in to submit suggestions.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    try {
-      setIsSubmittingSuggestion(true);
-      
-      // Validate form
-      const validatedData = validateSuggestionForm(suggestionForm);
-      
-      // Insert with user_id automatically
-      const { error } = await supabase
-        .from('suggestions')
-        .insert([{
-          user_id: user.id,
-          message: validatedData.message,
-          status: 'new'
-        }]);
-      
-      if (error) throw error;
-      
-      toast({
-        title: "Suggestion sent!",
-        description: "Thank you for your feedback. We'll review it shortly.",
-      });
-      
-      // Reset form and close dialog
-      setSuggestionForm({ message: '' });
-      setSuggestionDialogOpen(false);
-      
-    } catch (error: any) {
-      logErrorInDev('Submit suggestion error', error);
-      toast({
-        title: "Error",
-        description: getUserFriendlyErrorMessage(error),
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmittingSuggestion(false);
-    }
-  };
-
-  const features = [
-    {
-      icon: Palette,
-      title: "AI-Powered Creation",
-      description: "Generate unique images using advanced AI technology",
-    },
-    {
-      icon: Sparkles,
-      title: "Prompt Enhancement",
-      description: "Let AI help improve your creative prompts",
-    },
-    {
-      icon: Trophy,
-      title: "Competitive Scoring",
-      description: "Earn points when your images get votes from other players or the rounds judge",
-    },
-    {
-      icon: QrCode,
-      title: "Easy to Join",
-      description: "Simple room codes or QR codes for instant access",
-    },
-    {
-      icon: Users,
-      title: "Multiplayer Fun",
-      description: "Play with 3 or more friends for maximum entertainment",
-    },
-    {
-      icon: Zap,
-      title: "Real-time Updates",
-      description: "Everyone sees submissions and scores instantly",
-    },
-  ];
-
-  const useCases = [
-    { icon: PartyPopper, text: "Party games with friends" },
-    { icon: Briefcase, text: "Team building activities" },
-    { icon: Coffee, text: "Creative ice breakers" },
-    { icon: GamepadIcon, text: "Game nights" },
-  ];
-
-  const faqs = [
-    {
-      question: "How many players can join?",
-      answer: "You need at least 3 players to start a game. There's no strict maximum, but we recommend 4-10 players for the best experience.",
-    },
-    {
-      question: "Do I need an account to play?",
-      answer: "Players don't need an account—just join with your name and room code! However, hosts do need to create a free account to host games and manage prompts.",
-    },
-    {
-      question: "How does the judging work?",
-      answer: "Players take turns being the judge each round. The judge either selects a prompt from the game's prompt library or creates their own custom prompt. All other players then generate images based on that prompt. The judge reviews all submissions and picks their favorite—the creator of the winning image earns a point! The judge role rotates to a different player each round, so everyone gets a turn.",
-    },
-    {
-      question: "What's the best setup for playing?",
-      answer: "For the optimal experience, the host should use a laptop or connect to a TV/monitor so everyone can view the game together. Players join on their mobile phones to submit their images. This setup makes it perfect for parties and group gatherings where everyone can see the submissions on the big screen while using their phones to play.",
-    },
-    {
-      question: "Can I play multiple rounds?",
-      answer: "Yes! The host controls the game flow and can start as many rounds as you want. Scores carry over between rounds for continuous competition.",
-    },
-    {
-      question: "What happens if someone disconnects?",
-      answer: "The game continues with the remaining players. If the host disconnects, the game will end. Players can reconnect using the same room code if they disconnect accidentally.",
-    },
-  ];
-
-  return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-16 items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-6 h-6 text-primary" />
-            <span className="font-bold text-xl">Prompted</span>
-            
-            {/* Suggestions Button */}
-            <Dialog open={suggestionDialogOpen} onOpenChange={setSuggestionDialogOpen}>
-              <DialogTrigger asChild>
-              <Button variant="ghost" size="sm" className="ml-2 text-muted-foreground hover:text-foreground">
-                <Mail className="w-4 h-4 md:mr-1" />
-                <span className="hidden md:inline">Suggestions or Prompt Ideas?</span>
-              </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[500px]">
-                <DialogHeader>
-                  <DialogTitle>Share Your Suggestions or Prompt Ideas</DialogTitle>
-                </DialogHeader>
-                
-                {!user ? (
-                  // Show login prompt if not authenticated
-                  <div className="space-y-4 mt-4 text-center py-8">
-                    <p className="text-muted-foreground">
-                      Please log in to submit suggestions and prompt ideas.
-                    </p>
-                    <Button onClick={() => {
-                      setSuggestionDialogOpen(false);
-                      navigate('/auth');
-                    }}>
-                      Log In to Submit
-                    </Button>
-                  </div>
-                ) : (
-                  // Show form if authenticated
-                  <form onSubmit={handleSuggestionSubmit} className="space-y-4 mt-4">
-                    <div className="text-sm text-muted-foreground">
-                      Submitting as: <span className="font-medium text-foreground">{user.email}</span>
-                    </div>
-                    
-                    <div>
-                      <Label htmlFor="suggestion-message">Your Suggestion or Prompt Idea</Label>
-                      <Textarea
-                        id="suggestion-message"
-                        placeholder="Share your ideas for new prompts or suggestions to improve the game..."
-                        value={suggestionForm.message}
-                        onChange={(e) => setSuggestionForm({ ...suggestionForm, message: e.target.value })}
-                        required
-                        minLength={10}
-                        maxLength={2000}
-                        rows={8}
-                        className="resize-none"
-                      />
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {suggestionForm.message.length}/2000 characters
-                      </p>
-                    </div>
-                    
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setSuggestionDialogOpen(false)}
-                        disabled={isSubmittingSuggestion}
-                      >
-                        Cancel
-                      </Button>
-                      <Button type="submit" disabled={isSubmittingSuggestion}>
-                        {isSubmittingSuggestion ? "Sending..." : "Send Suggestion"}
-                      </Button>
-                    </div>
-                  </form>
-                )}
-              </DialogContent>
-            </Dialog>
-          </div>
-          <div className="flex items-center gap-2">
+  // ─────────────────────────────────────────────
+  // Shared header
+  // ─────────────────────────────────────────────
+  const Header = ({ showBack = false }: { showBack?: boolean }) => (
+    <header className="sticky top-0 z-50 bg-[#f5f2eb]/90 backdrop-blur-sm border-b border-stone-200 px-6 py-4 flex items-center justify-between">
+      <button onClick={() => setMode("marketing")} className="font-serif text-2xl font-bold tracking-tight text-stone-900 hover:opacity-70 transition-opacity">
+        Prompted.
+      </button>
+      <div className="flex items-center gap-3">
+        {showBack && (
+          <button onClick={() => setMode("marketing")} className="text-sm text-stone-500 hover:text-stone-800 transition-colors">
+            ← Back
+          </button>
+        )}
+        {!showBack && (
+          <>
             {user ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="gap-1">
-                    {user.email}
-                    <ChevronDown className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="bg-popover">
-                  <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
-                    Log Out
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <Button variant="ghost" onClick={() => navigate("/auth")}>
-                Login
-              </Button>
-            )}
-            {mode === 'marketing' && (
-              <Button onClick={() => user ? setMode('create') : navigate('/auth?next=host')}>
-                Get Started <ArrowRight className="ml-2 w-4 h-4" />
-              </Button>
-            )}
-            {mode !== 'marketing' && (
-              <Button variant="outline" onClick={() => setMode('marketing')}>
-                Back to Home
-              </Button>
-            )}
-          </div>
-        </div>
-      </header>
-
-      {/* Active Games Management */}
-      {mode === 'active-games' && user && hostRooms.length > 0 && (
-        <section className="container py-24">
-          <div className="max-w-md mx-auto space-y-4">
-            <h1 className="text-3xl font-bold text-center mb-4">Your Active Games</h1>
-            
-            <div className="space-y-3">
-              {hostRooms.map(room => (
-                <Card key={room.id}>
-                  <CardContent className="p-4">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <p className="text-xl font-bold">{room.code}</p>
-                        <p className="text-sm text-muted-foreground capitalize">
-                          {room.status}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(room.created_at).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button 
-                          onClick={() => handleContinueRoom(room.id)}
-                          size="sm"
-                        >
-                          Continue
-                        </Button>
-                        <Button 
-                          variant="destructive" 
-                          size="sm"
-                          onClick={() => handleEndRoom(room.id)}
-                        >
-                          End
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-            
-            <Button
-              onClick={() => user ? setMode('create') : navigate('/auth?next=host')}
-              className="w-full"
-              variant="default"
-            >
-              Create New Game
-            </Button>
-            
-            <Button 
-              onClick={() => setMode('join')} 
-              className="w-full"
-              variant="secondary"
-            >
-              Join Game
-            </Button>
-            
-            <Button 
-              onClick={() => setMode('marketing')} 
-              variant="outline"
-              className="w-full"
-            >
-              Back to Home
-            </Button>
-          </div>
-        </section>
-      )}
-
-      {/* Create Game Mode Selection */}
-      {mode === 'create' && (
-        <section className="container py-24">
-          <div className="max-w-2xl mx-auto space-y-6">
-            <h1 className="text-4xl font-bold text-center mb-8">Select Game Mode</h1>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card
-                onClick={() => setGameMode('judge')}
-                className={`p-8 cursor-pointer transition-all hover:scale-105 ${
-                  gameMode === 'judge'
-                    ? 'ring-4 ring-primary bg-primary/10'
-                    : 'hover:shadow-lg'
-                }`}
-              >
-                <CardContent className="p-0 space-y-4">
-                  <h3 className="font-bold text-2xl">Judge Mode</h3>
-                  <p className="text-muted-foreground">
-                    One player judges and selects the winning image each round. Classic gameplay!
-                  </p>
-                  <ul className="text-sm text-muted-foreground space-y-1">
-                    <li>• Rotating judge each round</li>
-                    <li>• Judge picks the winner</li>
-                    <li>• Requires 3+ players</li>
-                  </ul>
-                </CardContent>
-              </Card>
-
-              <Card
-                onClick={() => setGameMode('voting')}
-                className={`p-8 cursor-pointer transition-all hover:scale-105 ${
-                  gameMode === 'voting'
-                    ? 'ring-4 ring-primary bg-primary/10'
-                    : 'hover:shadow-lg'
-                }`}
-              >
-                <CardContent className="p-0 space-y-4">
-                  <h3 className="font-bold text-2xl">Voting Mode</h3>
-                  <p className="text-muted-foreground">
-                    All players vote for prompts and images. More democratic and engaging!
-                  </p>
-                  <ul className="text-sm text-muted-foreground space-y-1">
-                    <li>• Everyone votes on prompts</li>
-                    <li>• Everyone votes on images</li>
-                    <li>• Requires 3+ players</li>
-                  </ul>
-                </CardContent>
-              </Card>
-
-              <Card
-                onClick={() => setGameMode('forgery')}
-                className={`p-8 cursor-pointer transition-all hover:scale-105 ${
-                  gameMode === 'forgery'
-                    ? 'ring-4 ring-primary bg-primary/10'
-                    : 'hover:shadow-lg'
-                }`}
-              >
-                <CardContent className="p-0 space-y-4">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-2xl">Forgery Mode</h3>
-                    <Badge className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground animate-pulse">NEW!</Badge>
-                  </div>
-                  <p className="text-muted-foreground">
-                    Secret agents receive different prompts. Can you spot the forger?
-                  </p>
-                  <ul className="text-sm text-muted-foreground space-y-1">
-                    <li>• Secret prompt assignments</li>
-                    <li>• Vote to identify the forger</li>
-                    <li>• Requires 3+ players</li>
-                  </ul>
-                </CardContent>
-              </Card>
-            </div>
-            
-            <div className="flex gap-4">
-              <Button 
-                onClick={() => setMode(user && hostRooms.length > 0 ? 'active-games' : 'marketing')}
-                variant="outline"
-                className="flex-1"
-              >
-                Back
-              </Button>
-              <Button 
-                onClick={() => handleCreateRoom(gameMode)}
-                className="flex-1"
-                size="lg"
-              >
-                Create {gameMode === 'judge' ? 'Judge' : gameMode === 'voting' ? 'Voting' : 'Forgery'} Game
-              </Button>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Join Game Form */}
-      {mode === 'join' && (
-        <section className="container py-24">
-          <div className="max-w-md mx-auto space-y-4">
-            <h1 className="text-3xl font-bold text-center mb-4">Join Game</h1>
-            
-            {/* Name Input - Always shown */}
-            <Input
-              placeholder="Your name"
-              value={playerName}
-              onChange={(e) => setPlayerName(e.target.value)}
-              className="h-12 text-lg"
-              autoFocus
-            />
-            
-            {/* Room Code - Conditional rendering based on URL parameter */}
-            {searchParams.get('code') ? (
-              // Code from QR - show as read-only badge
-              <div className="p-4 bg-muted rounded-lg border-2 border-border text-center">
-                <p className="text-sm text-muted-foreground mb-1">Joining room:</p>
-                <p className="text-2xl font-bold tracking-widest text-foreground">{roomCode}</p>
-              </div>
-            ) : (
-              // Manual join - show editable input
-              <Input
-                placeholder="Room code"
-                value={roomCode}
-                onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
-                className="h-12 text-lg"
-              />
-            )}
-            
-            <Button 
-              onClick={() => handleJoinRoom(playerName, roomCode)}
-              disabled={!playerName.trim() || !roomCode.trim()}
-              className="w-full h-12 text-lg"
-            >
-              Join Room
-            </Button>
-            <Button 
-              onClick={() => setMode('marketing')} 
-              variant="outline"
-              className="w-full"
-            >
-              Back
-            </Button>
-          </div>
-        </section>
-      )}
-
-      {/* Hero Section */}
-      {mode === 'marketing' && (
-        <>
-          <section className="container py-24 md:py-32">
-            <div className="flex flex-col items-center text-center space-y-8">
-              <Badge variant="secondary" className="text-sm">
-                <Sparkles className="w-3 h-3 mr-1" />
-                Powered by AI
-              </Badge>
-              <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight">
-                <span className="text-primary text-5xl md:text-7xl lg:text-8xl block mb-2">Prompted</span>
-                <span className="text-2xl md:text-4xl lg:text-5xl block text-foreground">The AI Image Party Game</span>
-              </h1>
-              <p className="text-xl text-muted-foreground max-w-2xl">
-                A multiplayer party game where <span className="text-primary font-semibold">creativity meets AI</span>. Players use AI to create images based on creative prompts, then vote on the best submissions to earn points.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4">
-                <Button size="lg" onClick={() => user ? setMode('create') : navigate('/auth?next=host')} className="text-lg">
-                  <Users className="mr-2 w-5 h-5" />
+              <>
+                <Button variant="ghost" size="sm" onClick={() => setMode(hostRooms.length > 0 ? "active-games" : "create")} className="text-stone-600 hover:text-stone-900">
+                  My Games
+                </Button>
+                <Button variant="ghost" size="sm" onClick={handleLogout} className="text-stone-500 hover:text-stone-800">
+                  Sign Out
+                </Button>
+                <Button size="sm" onClick={() => setMode("create")} className="bg-stone-900 hover:bg-stone-800 text-white">
                   Host a Game
                 </Button>
-                <Button size="lg" variant="outline" onClick={() => setMode('join')} className="text-lg">
-                  <QrCode className="mr-2 w-5 h-5" />
-                  Join a Game
+              </>
+            ) : (
+              <>
+                <Button variant="ghost" size="sm" onClick={() => navigate("/auth")} className="text-stone-500 hover:text-stone-800">
+                  Sign In
                 </Button>
-              </div>
-            </div>
-          </section>
-
-          <Separator className="container" />
-
-          {/* What Is This Game Section */}
-          <section className="container py-24">
-            <div className="max-w-3xl mx-auto text-center space-y-6">
-              <h2 className="text-3xl md:text-4xl font-bold">What Is Prompted?</h2>
-              <p className="text-lg text-muted-foreground">
-                Prompted is a social party game that combines the power of artificial intelligence with
-                your creativity. For the best experience, the host should use a laptop or connect to a TV screen
-                that everyone can see, while players join on their mobile phones.
-              </p>
-              <p className="text-lg text-muted-foreground">
-                Players take turns being the judge each round—the judge picks or creates a prompt, and everyone
-                else competes to generate the best image to win the judge's approval. It's perfect for game nights,
-                team building, or just hanging out with friends!
-              </p>
-            </div>
-          </section>
-
-          {/* How to Play Section */}
-          <section className="container py-24 bg-muted/30">
-        <div className="max-w-5xl mx-auto space-y-12">
-          <div className="text-center space-y-4">
-            <h2 className="text-3xl md:text-4xl font-bold">How to Play</h2>
-            <p className="text-lg text-muted-foreground">Simple steps to start your creative competition</p>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-8">
-            {/* For Hosts */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="w-5 h-5 text-primary" />
-                  For Hosts
-                </CardTitle>
-                <CardDescription>Control the game and facilitate the fun</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex gap-3">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
-                    1
-                  </div>
-                  <p className="text-sm">Create a game room on your laptop or computer (ideal for screen sharing to a TV)</p>
-                </div>
-                <div className="flex gap-3">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
-                    2
-                  </div>
-                  <p className="text-sm">Share the code or QR code with players</p>
-                </div>
-                <div className="flex gap-3">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
-                    3
-                  </div>
-                  <p className="text-sm">Start the game when everyone has joined</p>
-                </div>
-                <div className="flex gap-3">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
-                    4
-                  </div>
-                  <p className="text-sm">Monitor all player submissions on the big screen for everyone to see</p>
-                </div>
-                <div className="flex gap-3">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
-                    5
-                  </div>
-                  <p className="text-sm">Track scores across multiple rounds</p>
-                </div>
-                <div className="mt-4 p-3 bg-primary/10 rounded-lg">
-                  <p className="text-sm">💡 Best played with your screen shared to a TV while players use their phones</p>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* For Players */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <GamepadIcon className="w-5 h-5 text-primary" />
-                  For Players
-                </CardTitle>
-                <CardDescription>Join on your phone for the best mobile experience</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex gap-3">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
-                    1
-                  </div>
-                  <p className="text-sm">Join with your name and room code on your mobile device</p>
-                </div>
-                <div className="flex gap-3">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
-                    2
-                  </div>
-                  <p className="text-sm">Wait for the host to start the game</p>
-                </div>
-                <div className="flex gap-3">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
-                    3
-                  </div>
-                  <p className="text-sm">One player is selected as the judge—they choose a prompt from the library or create their own</p>
-                </div>
-                <div className="flex gap-3">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
-                    4
-                  </div>
-                  <p className="text-sm">Generate your best image to impress the judge (if you're not the judge this round)</p>
-                </div>
-                <div className="flex gap-3">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
-                    5
-                  </div>
-                  <p className="text-sm">If you're the judge, review all submissions and pick your favorite. Otherwise, wait for the judge's decision!</p>
-                </div>
-                <div className="flex gap-3">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
-                    6
-                  </div>
-                  <p className="text-sm">Compete for points as the judge role rotates each round!</p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-          </div>
-        </section>
-
-          {/* Key Features Section */}
-          <section className="container py-24">
-            <div className="max-w-5xl mx-auto space-y-12">
-              <div className="text-center space-y-4">
-                <h2 className="text-3xl md:text-4xl font-bold">Key Features</h2>
-                <p className="text-lg text-muted-foreground">Everything you need for an amazing game experience</p>
-              </div>
-
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {features.map((feature, index) => (
-                  <Card key={index}>
-                    <CardHeader>
-                      <feature.icon className="w-10 h-10 text-primary mb-2" />
-                      <CardTitle className="text-xl">{feature.title}</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-muted-foreground">{feature.description}</p>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          {/* Game Roles Section */}
-          <section className="container py-24 bg-muted/30">
-            <div className="max-w-4xl mx-auto space-y-12">
-              <div className="text-center space-y-4">
-                <h2 className="text-3xl md:text-4xl font-bold">Game Roles Explained</h2>
-                <p className="text-lg text-muted-foreground">Understanding your role in the game</p>
-              </div>
-
-              <div className="grid md:grid-cols-3 gap-6">
-                <Card>
-                  <CardHeader>
-                    <Users className="w-10 h-10 text-primary mb-2" />
-                    <CardTitle>Host</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-muted-foreground">
-                      Controls the game flow, can see all players and submissions, and starts each round
-                    </p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <Trophy className="w-10 h-10 text-primary mb-2" />
-                    <CardTitle>Judge</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-muted-foreground">
-                      Rotates each round among all players. The judge selects or creates the creative prompt,
-                      then reviews all submissions and picks their favorite winning image. You can't be the
-                      judge and compete in the same round.
-                    </p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <GamepadIcon className="w-10 h-10 text-primary mb-2" />
-                    <CardTitle>Players</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-muted-foreground">
-                      Create images based on prompts and vote on submissions to earn points
-                    </p>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-          </section>
-
-          {/* Perfect For Section */}
-          <section className="container py-24">
-            <div className="max-w-4xl mx-auto space-y-12">
-              <div className="text-center space-y-4">
-                <h2 className="text-3xl md:text-4xl font-bold">Perfect For</h2>
-                <p className="text-lg text-muted-foreground">Great occasions to play Prompted</p>
-              </div>
-
-              <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                {useCases.map((useCase, index) => (
-                  <Card key={index} className="text-center">
-                    <CardContent className="pt-6 space-y-2">
-                      <useCase.icon className="w-8 h-8 text-primary mx-auto" />
-                      <p className="text-sm font-medium">{useCase.text}</p>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          {/* FAQ Section */}
-          <section className="container py-24 bg-muted/30">
-            <div className="max-w-3xl mx-auto space-y-12">
-              <div className="text-center space-y-4">
-                <h2 className="text-3xl md:text-4xl font-bold">Frequently Asked Questions</h2>
-                <p className="text-lg text-muted-foreground">Everything you need to know</p>
-              </div>
-
-              <Accordion type="single" collapsible className="w-full">
-                {faqs.map((faq, index) => (
-                  <AccordionItem key={index} value={`item-${index}`}>
-                    <AccordionTrigger className="text-left">{faq.question}</AccordionTrigger>
-                    <AccordionContent className="text-muted-foreground">{faq.answer}</AccordionContent>
-                  </AccordionItem>
-                ))}
-              </Accordion>
-            </div>
-          </section>
-
-          {/* Footer CTA */}
-          <section className="container py-24">
-            <Card className="bg-primary text-primary-foreground">
-              <CardContent className="py-12">
-                <div className="max-w-3xl mx-auto text-center space-y-8">
-                  <h2 className="text-3xl md:text-4xl font-bold">Ready to Start Playing?</h2>
-                  <p className="text-lg opacity-90">
-                    Join thousands of players creating amazing AI-generated images and competing with friends
-                  </p>
-                  <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                    <Button
-                      size="lg"
-                      variant="secondary"
-                      onClick={() => user ? setMode('create') : navigate('/auth?next=host')}
-                      className="text-lg"
-                    >
-                      <Users className="mr-2 w-5 h-5" />
-                      Host a Game
-                    </Button>
-                    <Button
-                      size="lg"
-                      variant="outline"
-                      onClick={() => setMode('join')}
-                      className="text-lg bg-primary-foreground text-primary hover:bg-primary-foreground/90"
-                    >
-                      <QrCode className="mr-2 w-5 h-5" />
-                      Join a Game
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </section>
-
-          {/* Footer */}
-          <footer className="border-t">
-            <div className="container py-8">
-              <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-primary" />
-                  <span className="font-semibold">Prompted</span>
-                </div>
-      <div className="flex items-center gap-4">
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          onClick={() => setSuggestionDialogOpen(true)}
-          className="text-muted-foreground hover:text-foreground"
-        >
-          <Mail className="w-4 h-4 md:mr-1" />
-          <span className="hidden md:inline">Suggestions or Prompt Ideas?</span>
-        </Button>
-        <Button variant="ghost" size="sm" onClick={() => navigate("/auth")}>
-          Login
-        </Button>
+                <Button size="sm" onClick={() => navigate("/auth?next=host")} className="bg-stone-900 hover:bg-stone-800 text-white">
+                  Get Started
+                </Button>
+              </>
+            )}
+          </>
+        )}
       </div>
+    </header>
+  );
+
+  // ─────────────────────────────────────────────
+  // CREATE MODE
+  // ─────────────────────────────────────────────
+  if (mode === "create") {
+    return (
+      <div className="min-h-screen bg-[#f5f2eb] flex flex-col">
+        <Header showBack />
+        <div className="flex-1 flex items-center justify-center p-6">
+          <div className="w-full max-w-lg space-y-8">
+            <div className="text-center space-y-2">
+              <p className="text-xs uppercase tracking-[0.25em] text-stone-400 font-medium">Select Your Experience</p>
+              <h1 className="font-serif text-4xl font-bold text-stone-900">Choose a Mode</h1>
+            </div>
+            <div className="space-y-3">
+              {[
+                { mode: "judge" as const, emoji: "⚖️", title: "Judge Mode", desc: "One judge picks the prompt. Everyone generates. The judge crowns a winner.", meta: "Takes turns judging" },
+                { mode: "voting" as const, emoji: "🗳️", title: "Voting Mode", desc: "Everyone votes on the prompt. Everyone votes on the winner. Democracy, but chaotic.", meta: "Everyone votes" },
+                { mode: "forgery" as const, emoji: "🕵️", title: "Forgery Mode", desc: "One player gets a different prompt. Can they blend in? Can you spot the forger?", meta: "Hidden roles" },
+              ].map((item) => (
+                <button
+                  key={item.mode}
+                  onClick={() => handleCreateRoom(item.mode)}
+                  disabled={isCreating}
+                  className="w-full group border border-stone-200 bg-white rounded-xl p-5 text-left hover:border-stone-900 hover:shadow-lg transition-all duration-200 disabled:opacity-50"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <span className="text-3xl">{item.emoji}</span>
+                      <div>
+                        <h2 className="font-serif text-lg font-bold text-stone-900">{item.title}</h2>
+                        <p className="text-stone-500 text-sm">{item.desc}</p>
+                        <p className="text-xs text-stone-400 mt-1">3–12 players · {item.meta}</p>
+                      </div>
+                    </div>
+                    <ArrowRight className="w-5 h-5 text-stone-300 group-hover:text-stone-900 group-hover:translate-x-1 transition-all flex-shrink-0" />
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─────────────────────────────────────────────
+  // JOIN MODE
+  // ─────────────────────────────────────────────
+  if (mode === "join") {
+    return (
+      <div className="min-h-screen bg-[#f5f2eb] flex flex-col">
+        <Header showBack />
+        <div className="flex-1 flex items-center justify-center p-6">
+          <div className="w-full max-w-sm space-y-8">
+            <div className="text-center space-y-2">
+              <p className="text-xs uppercase tracking-[0.25em] text-stone-400 font-medium">Join the Gallery</p>
+              <h1 className="font-serif text-4xl font-bold text-stone-900">Enter the Room</h1>
+            </div>
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs uppercase tracking-[0.15em] text-stone-500 font-medium">Your Name</label>
+                <Input
+                  value={playerName}
+                  onChange={(e) => setPlayerName(e.target.value)}
+                  placeholder="What do they call you?"
+                  className="bg-white border-stone-200 focus:border-stone-900 h-12 text-base"
+                  maxLength={20}
+                  onKeyDown={(e) => e.key === "Enter" && handleJoinRoom()}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs uppercase tracking-[0.15em] text-stone-500 font-medium">Room Code</label>
+                <Input
+                  value={roomCode}
+                  onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
+                  placeholder="XXXXXX"
+                  className="bg-white border-stone-200 focus:border-stone-900 h-12 text-base font-mono text-center tracking-[0.4em] uppercase"
+                  maxLength={6}
+                  onKeyDown={(e) => e.key === "Enter" && handleJoinRoom()}
+                />
+              </div>
+              <Button
+                onClick={handleJoinRoom}
+                disabled={!playerName.trim() || roomCode.length < 6 || isJoining}
+                className="w-full h-12 text-base bg-stone-900 hover:bg-stone-800 text-white"
+              >
+                {isJoining ? "Entering…" : "Enter the Gallery →"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─────────────────────────────────────────────
+  // ACTIVE GAMES MODE
+  // ─────────────────────────────────────────────
+  if (mode === "active-games" && user) {
+    return (
+      <div className="min-h-screen bg-[#f5f2eb] flex flex-col">
+        <Header showBack />
+        <div className="flex-1 flex items-center justify-center p-6">
+          <div className="w-full max-w-lg space-y-6">
+            <div className="text-center space-y-1">
+              <p className="text-xs uppercase tracking-[0.25em] text-stone-400 font-medium">Your Games</p>
+              <h1 className="font-serif text-3xl font-bold text-stone-900">Active Rooms</h1>
+            </div>
+            {hostRooms.map((room) => (
+              <div key={room.id} className="bg-white border border-stone-200 rounded-xl p-5 flex items-center justify-between">
+                <div>
+                  <p className="font-mono font-bold text-xl text-stone-900 tracking-widest">{room.code}</p>
+                  <p className="text-sm text-stone-500 capitalize">{room.game_mode || "judge"} mode · {room.status}</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => handleEndRoom(room.id)} className="text-stone-500 border-stone-200">
+                    Close
+                  </Button>
+                  <Button size="sm" onClick={() => {
+                    localStorage.setItem("hostRoomId", room.id);
+                    navigate("/play?mode=host");
+                  }} className="bg-stone-900 hover:bg-stone-800 text-white">
+                    Continue →
+                  </Button>
+                </div>
+              </div>
+            ))}
+            <Button onClick={() => setMode("create")} variant="outline" className="w-full border-stone-200 text-stone-700">
+              + Create New Game
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─────────────────────────────────────────────
+  // MARKETING (main landing)
+  // ─────────────────────────────────────────────
+  return (
+    <div className="min-h-screen bg-[#f5f2eb] font-sans overflow-x-hidden">
+      <Header />
+
+      {/* ── Hero ── */}
+      <section className="px-6 pt-24 pb-20 max-w-6xl mx-auto">
+        <div className="grid lg:grid-cols-2 gap-16 items-center">
+          {/* Left */}
+          <div className="space-y-8">
+            <div className="space-y-5">
+              <p className="text-xs uppercase tracking-[0.3em] text-stone-400 font-medium">The AI Image Party Game</p>
+              <h1 className="font-serif text-7xl lg:text-8xl font-bold text-stone-900 leading-[0.9]">
+                Prompted.
+              </h1>
+              <p className="text-xl text-stone-500 leading-relaxed max-w-sm">
+                Get a prompt. Generate something absurd.<br />
+                Try not to embarrass yourself.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Button
+                size="lg"
+                onClick={() => user ? setMode("create") : navigate("/auth?next=host")}
+                className="bg-stone-900 hover:bg-stone-800 text-white h-12 px-8 text-base font-medium"
+              >
+                Host a Game <ArrowRight className="ml-2 w-4 h-4" />
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={() => setMode("join")}
+                className="border-stone-300 text-stone-700 hover:bg-stone-100 h-12 px-8 text-base"
+              >
+                Join a Game
+              </Button>
+            </div>
+            <p className="text-xs text-stone-400">Free · No download · Works on any device</p>
+          </div>
+
+          {/* Right: animated gallery grid */}
+          <div className="grid grid-cols-2 gap-3 lg:gap-4">
+            {GALLERY_ITEMS.slice(0, 4).map((item, i) => (
+              <div
+                key={i}
+                className={`group relative aspect-square rounded-2xl overflow-hidden border border-stone-200/80 shadow-sm hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 ${item.rotation} cursor-pointer`}
+                style={{ animationDelay: `${i * 0.1}s` }}
+              >
+                <div className={`absolute inset-0 bg-gradient-to-br ${item.gradient} opacity-90`} />
+                {/* Gallery frame inset */}
+                <div className="absolute inset-3 border border-white/20 rounded-xl pointer-events-none" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-6xl drop-shadow-lg select-none" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.2))' }}>
+                    {item.emoji}
+                  </span>
+                </div>
+                {/* Hover caption */}
+                <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col items-start justify-end p-4">
+                  <p className="text-white/60 text-xs uppercase tracking-widest mb-1">Prompt</p>
+                  <p className="text-white text-sm font-medium leading-snug">"{item.caption}"</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── The Exhibit ── */}
+      <section className="bg-white border-y border-stone-200 py-24 px-6">
+        <div className="max-w-6xl mx-auto space-y-14">
+          <div className="text-center space-y-2">
+            <p className="text-xs uppercase tracking-[0.3em] text-stone-400 font-medium">The Exhibit</p>
+            <h2 className="font-serif text-5xl font-bold text-stone-900">Recent Masterpieces</h2>
+            <p className="text-stone-500">Submitted by real players. Judged by their peers. Remembered forever.</p>
+          </div>
+
+          {/* Masonry-style grid */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {GALLERY_ITEMS.map((item, i) => {
+              const isFeatured = i === 0 || i === 5;
+              return (
+                <div
+                  key={i}
+                  className={`group relative rounded-2xl overflow-hidden border border-stone-200 shadow-sm hover:shadow-xl transition-all duration-400 hover:-translate-y-1 cursor-pointer ${isFeatured ? "md:col-span-2 aspect-[2/1]" : "aspect-square"} ${item.rotation}`}
+                >
+                  <div className={`absolute inset-0 bg-gradient-to-br ${item.gradient}`} />
+                  {/* Frame */}
+                  <div className="absolute inset-2 border border-white/15 rounded-xl pointer-events-none" />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className={`select-none drop-shadow-lg ${isFeatured ? "text-8xl" : "text-5xl"}`}>
+                      {item.emoji}
+                    </span>
+                  </div>
+                  {/* Slide-up caption */}
+                  <div className="absolute bottom-0 inset-x-0 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out bg-gradient-to-t from-black/80 to-transparent p-4 pt-8">
+                    <p className="text-white text-xs font-semibold leading-snug">"{item.caption}"</p>
+                    <p className="text-white/50 text-xs mt-0.5 font-mono">{item.prompt}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* ── How It Works ── */}
+      <section className="py-24 px-6 max-w-4xl mx-auto">
+        <div className="text-center space-y-2 mb-20">
+          <p className="text-xs uppercase tracking-[0.3em] text-stone-400 font-medium">The Rules</p>
+          <h2 className="font-serif text-5xl font-bold text-stone-900">Three steps to chaos.</h2>
+        </div>
+        <div className="grid md:grid-cols-3 gap-12">
+          {[
+            { num: "01", emoji: "📜", title: "Get a Prompt", body: "The judge picks a prompt. Everyone gets the same challenge. No excuses." },
+            { num: "02", emoji: "🎨", title: "Generate an Image", body: "Use AI to create your masterpiece. It will be weird. That's the point." },
+            { num: "03", emoji: "🏆", title: "Get Judged", body: "The judge picks a winner. Points are awarded. Dignity is optional." },
+          ].map((step) => (
+            <div key={step.num} className="text-center space-y-5 group">
+              <div className="relative inline-flex items-center justify-center w-24 h-24">
+                <span className="font-serif text-8xl font-bold text-stone-100 group-hover:text-stone-200 transition-colors leading-none select-none">
+                  {step.num}
+                </span>
+                <span className="absolute text-4xl">{step.emoji}</span>
+              </div>
+              <div className="space-y-1.5">
+                <h3 className="font-serif text-xl font-bold text-stone-900">{step.title}</h3>
+                <p className="text-stone-500 text-sm leading-relaxed">{step.body}</p>
               </div>
             </div>
-          </footer>
-        </>
-      )}
+          ))}
+        </div>
+      </section>
+
+      {/* ── Final CTA ── */}
+      <section className="bg-stone-900 py-28 px-6 text-center">
+        <div className="max-w-xl mx-auto space-y-8">
+          <div className="space-y-3">
+            <h2 className="font-serif text-6xl font-bold text-white leading-tight">
+              Play tonight.
+            </h2>
+            <p className="text-stone-400 text-lg">Free. No app. Just a room code and your dignity.</p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Button
+              size="lg"
+              onClick={() => user ? setMode("create") : navigate("/auth?next=host")}
+              className="bg-white hover:bg-stone-100 text-stone-900 h-12 px-8 text-base font-medium"
+            >
+              Host a Game <ArrowRight className="ml-2 w-4 h-4" />
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={() => setMode("join")}
+              className="border-stone-600 text-white hover:bg-stone-800 h-12 px-8 text-base"
+            >
+              Join a Game
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Footer ── */}
+      <footer className="px-6 py-8 border-t border-stone-200 flex items-center justify-between text-xs text-stone-400">
+        <span className="font-serif text-stone-600 font-semibold">Prompted.</span>
+        <span>© 2026 · <button onClick={() => navigate("/auth")} className="hover:text-stone-600 transition-colors">Sign In</button></span>
+      </footer>
     </div>
   );
 };
