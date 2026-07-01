@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User, Session } from '@supabase/supabase-js';
 import { ZodError } from 'zod';
@@ -132,6 +132,20 @@ const Index = () => {
   const [forgeryScoreChanges, setForgeryScoreChanges] = useState<Record<string, number>>({});
   const [playerForgeryPrompt, setPlayerForgeryPrompt] = useState<string | null>(null);
   const { toast } = useToast();
+
+  // Prevents host double-clicks from firing a state-transition handler twice
+  // (double round creation, double score increment, etc.). Each guarded
+  // handler wraps its body in withGuard('unique-key', ...).
+  const inFlightRef = useRef<Set<string>>(new Set());
+  const withGuard = async (key: string, fn: () => Promise<void>): Promise<void> => {
+    if (inFlightRef.current.has(key)) return;
+    inFlightRef.current.add(key);
+    try {
+      await fn();
+    } finally {
+      inFlightRef.current.delete(key);
+    }
+  };
 
   // NOTE: Client-side host check is for UI rendering only, NOT for authorization
   // All privileged operations are protected by RLS policies and server-side checks
@@ -1133,7 +1147,7 @@ const Index = () => {
     fetchRoom();
   };
 
-  const handleStartGame = async () => {
+  const handleStartGame = () => withGuard('startGame', async () => {
     if (!isHost || !roomId || !user) return;
     
     // Verify minimum 3 players for judge mode
@@ -1175,9 +1189,9 @@ const Index = () => {
       setCurrentRound(roundData as Round);
       setGameState('round-start');
     }
-  };
+  });
 
-  const handleRoundContinue = async (selectedPrompt: string) => {
+  const handleRoundContinue = (selectedPrompt: string) => withGuard('roundContinue', async () => {
     if (!currentRound) return;
     
     // Only the host should update the database
@@ -1219,7 +1233,7 @@ const Index = () => {
         variant: 'destructive'
       });
     }
-  };
+  });
 
   const handleImageSubmit = async (file: File) => {
     console.log('🖼️ Starting image submission...');
@@ -1311,7 +1325,7 @@ const Index = () => {
     fetchSubmissions(currentRound.id);
   };
 
-  const handleStartJudging = async () => {
+  const handleStartJudging = () => withGuard('startJudging', async () => {
     if (!currentRound?.id) return;
     console.log('[Host] Start Judging pressed');
     await supabase.from('rounds').update({ status: 'judging' }).eq('id', currentRound.id);
@@ -1320,9 +1334,9 @@ const Index = () => {
       title: 'Judging Started',
       description: 'Judge can now review submissions',
     });
-  };
+  });
 
-  const handleSelectWinner = async (submissionId: string) => {
+  const handleSelectWinner = (submissionId: string) => withGuard('selectWinner', async () => {
     if (!currentRound) return;
 
     console.log('[Host] Selecting winner:', submissionId);
@@ -1331,10 +1345,10 @@ const Index = () => {
 
     // Mark submission as winner
     await supabase.from('submissions').update({ is_winner: true }).eq('id', submissionId);
-    
+
     // Update round status
     await supabase.from('rounds').update({ status: 'complete' }).eq('id', currentRound.id);
-    
+
     // Increment winner's score using secure function
     const { error: scoreError } = await supabase.rpc('increment_player_score', {
       p_player_id: submission.player_id,
@@ -1351,9 +1365,9 @@ const Index = () => {
     await fetchPlayers();
     await fetchCurrentRound();
     setGameState('winner-reveal');
-  };
+  });
 
-  const handleNextRound = async () => {
+  const handleNextRound = () => withGuard('nextRound', async () => {
     if (!isHost || !roomId || !currentRound || !user || !room) return;
 
     const nextRoundNumber = currentRound.round_number + 1;
@@ -1467,7 +1481,7 @@ const Index = () => {
         });
       }
     }
-  };
+  });
 
   const submissionsWithPlayerNames = submissions.map(sub => ({
     ...sub,
@@ -1713,7 +1727,7 @@ const Index = () => {
 
   // ============= VOTING MODE HANDLERS =============
 
-  const handleStartGameVoting = async () => {
+  const handleStartGameVoting = () => withGuard('startGameVoting', async () => {
     if (!isHost || !roomId || !user) return;
     
     try {
@@ -1770,11 +1784,11 @@ const Index = () => {
         variant: 'destructive'
       });
     }
-  };
+  });
 
   // ============= FORGERY MODE HANDLERS =============
 
-  const handleStartGameForgery = async () => {
+  const handleStartGameForgery = () => withGuard('startGameForgery', async () => {
     if (!isHost || !roomId || !user) return;
 
     if (players.length < 3) {
@@ -1814,7 +1828,7 @@ const Index = () => {
       console.error('Start forgery game error:', error);
       toast({ title: 'Error', description: getUserFriendlyErrorMessage(error), variant: 'destructive' });
     }
-  };
+  });
 
   const handleForgeryVote = async (accusedPlayerId: string) => {
     if (!playerId || !currentRound?.id) return;
@@ -1837,7 +1851,7 @@ const Index = () => {
     }
   };
 
-  const handleEndForgeryVoting = async () => {
+  const handleEndForgeryVoting = () => withGuard('endForgeryVoting', async () => {
     if (!isHost || !currentRound?.id) return;
 
     try {
@@ -1876,7 +1890,7 @@ const Index = () => {
       console.error('End forgery voting error:', error);
       toast({ title: 'Error', description: getUserFriendlyErrorMessage(error), variant: 'destructive' });
     }
-  };
+  });
 
   // ============= END FORGERY MODE HANDLERS =============
 
@@ -1907,7 +1921,7 @@ const Index = () => {
     }
   };
 
-  const handlePromptVotingComplete = async () => {
+  const handlePromptVotingComplete = () => withGuard('promptVotingComplete', async () => {
     if (!isHost || !currentRound?.id) return;
     
     try {
@@ -1966,9 +1980,9 @@ const Index = () => {
         variant: 'destructive'
       });
     }
-  };
+  });
 
-  const handleStartPresentation = async () => {
+  const handleStartPresentation = () => withGuard('startPresentation', async () => {
     if (!isHost || !currentRound?.id) return;
     
     try {
@@ -2002,9 +2016,9 @@ const Index = () => {
         variant: 'destructive'
       });
     }
-  };
+  });
 
-  const handleStartImageVoting = async () => {
+  const handleStartImageVoting = () => withGuard('startImageVoting', async () => {
     if (!isHost || !currentRound?.id) return;
     
     try {
@@ -2023,7 +2037,7 @@ const Index = () => {
         variant: 'destructive'
       });
     }
-  };
+  });
 
   const handleImageVote = async (submissionId: string) => {
     if (!playerId || !currentRound?.id) return;
@@ -2062,7 +2076,7 @@ const Index = () => {
     }
   };
 
-  const handleImageVotingComplete = async () => {
+  const handleImageVotingComplete = () => withGuard('imageVotingComplete', async () => {
     if (!isHost || !currentRound?.id) return;
     
     // Check if there are any votes
@@ -2198,7 +2212,7 @@ const Index = () => {
         variant: 'destructive'
       });
     }
-  };
+  });
 
   const calculatePromptVoteCounts = (): Record<string, number> => {
     const counts: Record<string, number> = {};
