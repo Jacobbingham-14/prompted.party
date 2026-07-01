@@ -20,7 +20,7 @@ interface LobbyProps {
   onStartGame: () => void;
   onRemovePlayer?: (playerId: string) => void;
   onAvatarUpdated?: (playerId: string, url: string) => void;
-  gameMode: 'judge' | 'voting';
+  gameMode: 'judge' | 'voting' | 'forgery' | 'duel';
 }
 
 export default function Lobby({ roomCode, roomId, players, isHost, currentPlayerId, onStartGame, onRemovePlayer, onAvatarUpdated, gameMode }: LobbyProps) {
@@ -105,6 +105,14 @@ export default function Lobby({ roomCode, roomId, players, isHost, currentPlayer
               {gameMode === 'judge' ? (
                 <>
                   <span className="font-semibold text-foreground">Judge Mode:</span> One player will judge each round and pick the winner (3+ players required)
+                </>
+              ) : gameMode === 'forgery' ? (
+                <>
+                  <span className="font-semibold text-foreground">Forgery Mode:</span> One player gets a different secret prompt - spot the forger (3+ players required)
+                </>
+              ) : gameMode === 'duel' ? (
+                <>
+                  <span className="font-semibold text-foreground">Prompt Duel:</span> Head-to-head matchups over 3 rounds - vote for the funnier answer (3+ players required)
                 </>
               ) : (
                 <>

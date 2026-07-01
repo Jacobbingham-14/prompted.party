@@ -56,7 +56,7 @@ const Landing = () => {
   const [mode, setMode] = useState<'marketing' | 'active-games' | 'create' | 'join'>('marketing');
   const [playerName, setPlayerName] = useState('');
   const [roomCode, setRoomCode] = useState('');
-  const [gameMode, setGameMode] = useState<'judge' | 'voting' | 'forgery'>('judge');
+  const [gameMode, setGameMode] = useState<'judge' | 'voting' | 'forgery' | 'duel'>('judge');
   const [hostRooms, setHostRooms] = useState<Room[]>([]);
   const [suggestionDialogOpen, setSuggestionDialogOpen] = useState(false);
   const [suggestionForm, setSuggestionForm] = useState({ message: '' });
@@ -126,7 +126,7 @@ const Landing = () => {
     setMode('marketing');
   };
 
-  const handleCreateRoom = async (selectedGameMode: 'judge' | 'voting' | 'forgery') => {
+  const handleCreateRoom = async (selectedGameMode: 'judge' | 'voting' | 'forgery' | 'duel') => {
     if (!user) {
       navigate('/auth');
       return;
@@ -590,7 +590,7 @@ const Landing = () => {
           <div className="max-w-2xl mx-auto space-y-6">
             <h1 className="text-4xl font-bold text-center mb-8">Select Game Mode</h1>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Card
                 onClick={() => setGameMode('judge')}
                 className={`p-8 cursor-pointer transition-all hover:scale-105 ${
@@ -656,8 +656,32 @@ const Landing = () => {
                   </ul>
                 </CardContent>
               </Card>
+
+              <Card
+                onClick={() => setGameMode('duel')}
+                className={`p-8 cursor-pointer transition-all hover:scale-105 ${
+                  gameMode === 'duel'
+                    ? 'ring-4 ring-primary bg-primary/10'
+                    : 'hover:shadow-lg'
+                }`}
+              >
+                <CardContent className="p-0 space-y-4">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-2xl">Prompt Duel</h3>
+                    <Badge className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground animate-pulse">NEW!</Badge>
+                  </div>
+                  <p className="text-muted-foreground">
+                    Head-to-head matchups. Write the funnier answer, then everyone votes!
+                  </p>
+                  <ul className="text-sm text-muted-foreground space-y-1">
+                    <li>• Two prompts per player each round</li>
+                    <li>• One matchup revealed at a time</li>
+                    <li>• 3 rounds, rising stakes · 3+ players</li>
+                  </ul>
+                </CardContent>
+              </Card>
             </div>
-            
+
             <div className="flex gap-4">
               <Button 
                 onClick={() => setMode(user && hostRooms.length > 0 ? 'active-games' : 'marketing')}
@@ -671,7 +695,7 @@ const Landing = () => {
                 className="flex-1"
                 size="lg"
               >
-                Create {gameMode === 'judge' ? 'Judge' : gameMode === 'voting' ? 'Voting' : 'Forgery'} Game
+                Create {gameMode === 'judge' ? 'Judge' : gameMode === 'voting' ? 'Voting' : gameMode === 'forgery' ? 'Forgery' : 'Prompt Duel'} Game
               </Button>
             </div>
           </div>

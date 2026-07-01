@@ -14,6 +14,126 @@ export type Database = {
   }
   public: {
     Tables: {
+      duel_prompts: {
+        Row: {
+          created_at: string | null
+          id: string
+          text: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          text: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          text?: string
+        }
+        Relationships: []
+      }
+      duel_matchups: {
+        Row: {
+          created_at: string | null
+          id: string
+          matchup_order: number
+          player_a_id: string
+          player_b_id: string
+          prompt_text: string
+          room_id: string
+          round_id: string
+          status: string
+          winner_player_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          matchup_order: number
+          player_a_id: string
+          player_b_id: string
+          prompt_text: string
+          room_id: string
+          round_id: string
+          status?: string
+          winner_player_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          matchup_order?: number
+          player_a_id?: string
+          player_b_id?: string
+          prompt_text?: string
+          room_id?: string
+          round_id?: string
+          status?: string
+          winner_player_id?: string | null
+        }
+        Relationships: []
+      }
+      duel_submissions: {
+        Row: {
+          answer_text: string
+          created_at: string | null
+          id: string
+          image_status: string
+          image_url: string | null
+          matchup_id: string
+          player_id: string
+          round_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          answer_text: string
+          created_at?: string | null
+          id?: string
+          image_status?: string
+          image_url?: string | null
+          matchup_id: string
+          player_id: string
+          round_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          answer_text?: string
+          created_at?: string | null
+          id?: string
+          image_status?: string
+          image_url?: string | null
+          matchup_id?: string
+          player_id?: string
+          round_id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      duel_votes: {
+        Row: {
+          created_at: string | null
+          id: string
+          matchup_id: string
+          round_id: string
+          voted_player_id: string
+          voter_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          matchup_id: string
+          round_id: string
+          voted_player_id: string
+          voter_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          matchup_id?: string
+          round_id?: string
+          voted_player_id?: string
+          voter_id?: string
+        }
+        Relationships: []
+      }
       forgery_prompts: {
         Row: {
           created_at: string | null
@@ -368,7 +488,9 @@ export type Database = {
       }
       rounds: {
         Row: {
+          active_matchup_id: string | null
           created_at: string
+          deadline_at: string | null
           id: string
           judge_id: string | null
           presentation_order: Json | null
@@ -380,7 +502,9 @@ export type Database = {
           winning_submission_ids: string[] | null
         }
         Insert: {
+          active_matchup_id?: string | null
           created_at?: string
+          deadline_at?: string | null
           id?: string
           judge_id?: string | null
           presentation_order?: Json | null
@@ -392,7 +516,9 @@ export type Database = {
           winning_submission_ids?: string[] | null
         }
         Update: {
+          active_matchup_id?: string | null
           created_at?: string
+          deadline_at?: string | null
           id?: string
           judge_id?: string | null
           presentation_order?: Json | null
@@ -568,6 +694,21 @@ export type Database = {
           current_count: number
           max_limit: number
           remaining: number
+        }[]
+      }
+      create_duel_matchups: {
+        Args: { p_round_id: string; p_room_id: string }
+        Returns: undefined
+      }
+      finalize_duel_matchup: {
+        Args: { p_matchup_id: string }
+        Returns: {
+          a_votes: number
+          b_votes: number
+          player_a_id: string
+          player_b_id: string
+          points_per_vote: number
+          winner_player_id: string | null
         }[]
       }
       delete_ended_room: {

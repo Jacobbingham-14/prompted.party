@@ -23,6 +23,11 @@ import ForgeryRoundStart from '@/components/ForgeryRoundStart';
 import ForgeryVoting from '@/components/ForgeryVoting';
 import HostForgeryVoting from '@/components/HostForgeryVoting';
 import ForgeryReveal from '@/components/ForgeryReveal';
+import DuelSubmission from '@/components/DuelSubmission';
+import HostDuelSubmission from '@/components/HostDuelSubmission';
+import DuelVoting from '@/components/DuelVoting';
+import HostDuelVoting from '@/components/HostDuelVoting';
+import { buildDuelImagePrompt } from '@/lib/duelPrompt';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -39,7 +44,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-type GameState = 'home' | 'select-room' | 'lobby' | 'round-start' | 'prompt-voting' | 'submitting' | 'presenting' | 'image-voting' | 'judging' | 'winner-reveal' | 'scoreboard' | 'game-ended' | 'forgery-round-start' | 'forgery-voting' | 'forgery-reveal';
+type GameState = 'home' | 'select-room' | 'lobby' | 'round-start' | 'prompt-voting' | 'submitting' | 'presenting' | 'image-voting' | 'judging' | 'winner-reveal' | 'scoreboard' | 'game-ended' | 'forgery-round-start' | 'forgery-voting' | 'forgery-reveal' | 'duel-submitting' | 'duel-voting';
+
+type GameMode = 'judge' | 'voting' | 'forgery' | 'duel';
+
+const DUEL_TOTAL_ROUNDS = 3;
+const duelPointsForRound = (roundNumber: number) => roundNumber * 100;
 
 interface Player {
   id: string;
@@ -56,12 +66,41 @@ interface Room {
   status: string;
   host_id: string;
   created_at: string;
-  game_mode: 'judge' | 'voting' | 'forgery';
+  game_mode: GameMode;
 }
 
 interface ForgeryVote {
   voter_id: string;
   accused_player_id: string;
+}
+
+// ===== Duel mode =====
+interface DuelMatchup {
+  id: string;
+  round_id: string;
+  room_id: string;
+  matchup_order: number;
+  prompt_text: string;
+  player_a_id: string;
+  player_b_id: string;
+  status: string; // pending | voting | revealed
+  winner_player_id: string | null;
+}
+
+interface DuelSubmissionRow {
+  id: string;
+  matchup_id: string;
+  round_id: string;
+  player_id: string;
+  answer_text: string;
+  image_url: string | null;
+  image_status: string; // pending | generating | ready | failed
+}
+
+interface DuelVote {
+  matchup_id: string;
+  voter_id: string;
+  voted_player_id: string;
 }
 
 interface Round {
@@ -75,6 +114,7 @@ interface Round {
   winning_submission_ids: string[] | null;
   presentation_order?: string[] | null;
   deadline_at?: string | null;
+  active_matchup_id?: string | null;
 }
 
 const PHASE_DURATION_SECONDS: Record<string, number> = {
@@ -84,6 +124,7 @@ const PHASE_DURATION_SECONDS: Record<string, number> = {
   'image-voting': 30,
   'judging': 60,
   'forgery-voting': 30,
+  'duel-voting': 30,
 };
 
 const deadlineFor = (phase: string): string | null => {
@@ -147,6 +188,11 @@ const Index = () => {
   const [forgeryForgerIds, setForgeryForgerIds] = useState<string[]>([]);
   const [forgeryScoreChanges, setForgeryScoreChanges] = useState<Record<string, number>>({});
   const [playerForgeryPrompt, setPlayerForgeryPrompt] = useState<string | null>(null);
+  // Duel mode state
+  const [duelMatchups, setDuelMatchups] = useState<DuelMatchup[]>([]);
+  const [duelSubmissions, setDuelSubmissions] = useState<DuelSubmissionRow[]>([]);
+  const [duelVotes, setDuelVotes] = useState<DuelVote[]>([]);
+  const [currentDuelVote, setCurrentDuelVote] = useState<Record<string, string>>({}); // matchupId -> votedPlayerId
   const { toast } = useToast();
 
   // Prevents host double-clicks from firing a state-transition handler twice
@@ -554,6 +600,18 @@ const Index = () => {
       setGameState('forgery-reveal');
     } else if (currentRound.status === 'complete' && room?.game_mode === 'forgery') {
       setGameState('scoreboard');
+    } else if (currentRound.status === 'duel-submitting') {
+      fetchDuelMatchups(currentRound.id);
+      fetchDuelSubmissions(currentRound.id);
+      setGameState('duel-submitting');
+    } else if (currentRound.status === 'duel-voting') {
+      fetchDuelMatchups(currentRound.id);
+      fetchDuelSubmissions(currentRound.id);
+      fetchDuelVotes(currentRound.id);
+      setGameState('duel-voting');
+    } else if (currentRound.status === 'duel-complete') {
+      fetchPlayers();
+      setGameState('scoreboard');
     }
   }, [currentRound?.status]);
 
@@ -635,6 +693,29 @@ const Index = () => {
       }, () => {
         fetchForgeryVotes(currentRound.id);
       })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentRound?.id, room?.game_mode]);
+
+  // Subscribe to duel matchups / submissions / votes (duel mode only)
+  useEffect(() => {
+    if (!currentRound?.id || room?.game_mode !== 'duel') return;
+
+    fetchDuelMatchups(currentRound.id);
+    fetchDuelSubmissions(currentRound.id);
+    fetchDuelVotes(currentRound.id);
+
+    const channel = supabase
+      .channel(`duel-${currentRound.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'duel_matchups', filter: `round_id=eq.${currentRound.id}` },
+        () => fetchDuelMatchups(currentRound.id))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'duel_submissions', filter: `round_id=eq.${currentRound.id}` },
+        () => fetchDuelSubmissions(currentRound.id))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'duel_votes', filter: `round_id=eq.${currentRound.id}` },
+        () => fetchDuelVotes(currentRound.id))
       .subscribe();
 
     return () => {
@@ -865,6 +946,41 @@ const Index = () => {
     if (data) setForgeryVotes(data as ForgeryVote[]);
   };
 
+  const fetchDuelMatchups = async (roundId: string) => {
+    const { data } = await supabase
+      .from('duel_matchups')
+      .select('*')
+      .eq('round_id', roundId)
+      .order('matchup_order', { ascending: true });
+    if (data) setDuelMatchups(data as DuelMatchup[]);
+  };
+
+  const fetchDuelSubmissions = async (roundId: string) => {
+    const { data } = await supabase
+      .from('duel_submissions')
+      .select('*')
+      .eq('round_id', roundId);
+    if (data) setDuelSubmissions(data as DuelSubmissionRow[]);
+  };
+
+  const fetchDuelVotes = async (roundId: string) => {
+    const { data } = await supabase
+      .from('duel_votes')
+      .select('matchup_id, voter_id, voted_player_id')
+      .eq('round_id', roundId);
+    if (data) {
+      setDuelVotes(data as DuelVote[]);
+      // Restore this player's own votes so the UI reflects them across matchups.
+      if (playerId) {
+        const mine: Record<string, string> = {};
+        for (const v of data as DuelVote[]) {
+          if (v.voter_id === playerId) mine[v.matchup_id] = v.voted_player_id;
+        }
+        setCurrentDuelVote(prev => ({ ...mine, ...prev }));
+      }
+    }
+  };
+
   const fetchPlayerForgeryPrompt = async (roundId: string) => {
     if (!playerId) return;
     const { data } = await supabase
@@ -904,7 +1020,7 @@ const Index = () => {
     return Math.random().toString(36).substring(2, 8).toUpperCase();
   };
 
-  const handleCreateRoom = async (gameMode: 'judge' | 'voting' | 'forgery' = 'judge') => {
+  const handleCreateRoom = async (gameMode: GameMode = 'judge') => {
     if (!user?.id) {
       toast({ title: 'Authentication required', description: 'Please log in to host a game', variant: 'destructive' });
       return;
@@ -1447,7 +1563,7 @@ const Index = () => {
 
         if (assignError) throw assignError;
 
-        setCurrentRound({ ...roundData, status: 'forgery-prompt-assigned' });
+        setCurrentRound({ ...roundData, status: 'forgery-prompt-assigned' } as Round);
         setSubmissions([]);
         setForgeryVotes([]);
         setCurrentForgeryVote(null);
@@ -1737,7 +1853,7 @@ const Index = () => {
     // The real-time subscriptions and state sync will handle the rest
   };
 
-  const handleCreateNewRoom = (gameMode: 'judge' | 'voting' | 'forgery' = 'judge') => {
+  const handleCreateNewRoom = (gameMode: GameMode = 'judge') => {
     // Clear any old data
     localStorage.removeItem('hostRoomId');
     localStorage.removeItem('roomId');
@@ -1844,7 +1960,7 @@ const Index = () => {
 
       if (assignError) throw assignError;
 
-      setCurrentRound({ ...roundData, status: 'forgery-prompt-assigned' });
+      setCurrentRound({ ...roundData, status: 'forgery-prompt-assigned' } as Round);
       setGameState('forgery-round-start');
 
     } catch (error: any) {
@@ -1928,6 +2044,210 @@ const Index = () => {
   });
 
   // ============= END FORGERY MODE HANDLERS =============
+
+  // ============= DUEL MODE HANDLERS =============
+
+  // Creates round + matchups (via RPC). Shared by "start game" and "next round".
+  const startDuelRound = async (roundNumber: number): Promise<boolean> => {
+    if (!roomId) return false;
+    const { data: roundData, error: roundError } = await supabase
+      .from('rounds')
+      .insert({ room_id: roomId, round_number: roundNumber, judge_id: null, status: 'not_started' })
+      .select()
+      .single();
+
+    if (roundError || !roundData) {
+      toast({ title: 'Error', description: getUserFriendlyErrorMessage(roundError), variant: 'destructive' });
+      return false;
+    }
+
+    const { error: matchupError } = await supabase.rpc('create_duel_matchups', {
+      p_round_id: roundData.id,
+      p_room_id: roomId,
+    });
+
+    if (matchupError) {
+      toast({ title: 'Error', description: getUserFriendlyErrorMessage(matchupError), variant: 'destructive' });
+      return false;
+    }
+
+    // Reset per-round duel state
+    setDuelMatchups([]);
+    setDuelSubmissions([]);
+    setDuelVotes([]);
+    setCurrentDuelVote({});
+    setSubmissions([]);
+    setCurrentRound({ ...(roundData as Round), status: 'duel-submitting' });
+    await fetchDuelMatchups(roundData.id);
+    // Reconcile with the authoritative row (the RPC set status + deadline_at).
+    await fetchCurrentRound();
+    setGameState('duel-submitting');
+    return true;
+  };
+
+  const handleStartGameDuel = () => withGuard('startGameDuel', async () => {
+    if (!isHost || !roomId || !user) return;
+    if (players.length < 3) {
+      toast({ title: 'Not enough players', description: 'Duel mode requires at least 3 players', variant: 'destructive' });
+      return;
+    }
+    await supabase.from('rooms').update({ status: 'playing' }).eq('id', roomId);
+    await startDuelRound(1);
+  });
+
+  // Player submits a written answer -> transform -> generate image -> persist.
+  const handleDuelAnswerSubmit = async (matchupId: string, answerText: string) => {
+    if (!playerId || !currentRound?.id) return;
+    const answer = answerText.trim().slice(0, 200);
+    if (!answer) return;
+
+    // Mark as generating immediately so all screens show progress.
+    const nowIso = new Date().toISOString();
+    const { error: upsertError } = await supabase
+      .from('duel_submissions')
+      .upsert({
+        matchup_id: matchupId,
+        round_id: currentRound.id,
+        player_id: playerId,
+        answer_text: answer,
+        image_url: null,
+        image_status: 'generating',
+        updated_at: nowIso,
+      }, { onConflict: 'matchup_id,player_id' });
+
+    if (upsertError) {
+      toast({ title: 'Error', description: getUserFriendlyErrorMessage(upsertError), variant: 'destructive' });
+      return;
+    }
+    await fetchDuelSubmissions(currentRound.id);
+
+    try {
+      const imagePrompt = buildDuelImagePrompt(answer);
+      const { data, error } = await supabase.functions.invoke('generate-image', {
+        body: { prompt: imagePrompt, roomId },
+      });
+      if (error) throw new Error(error.message || 'Failed to generate image');
+
+      const replicateUrl = Array.isArray((data as any).output) ? (data as any).output[0] : (data as any).output;
+      if (!replicateUrl) throw new Error('No image returned');
+
+      // Persist to storage so the URL doesn't expire before voting/reveal.
+      const resp = await fetch(replicateUrl);
+      if (!resp.ok) throw new Error('Could not download generated image');
+      const blob = await resp.blob();
+      const ext = (blob.type.split('/')[1] || 'webp').replace('+xml', '');
+      const fileName = `${roomCode}/${currentRound.id}/duel/${matchupId}_${playerId}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from('game-images')
+        .upload(fileName, blob, { upsert: true, contentType: blob.type || 'image/webp' });
+      if (uploadError) throw uploadError;
+
+      const { data: pub } = supabase.storage.from('game-images').getPublicUrl(fileName);
+
+      await supabase
+        .from('duel_submissions')
+        .update({ image_url: pub.publicUrl, image_status: 'ready', updated_at: new Date().toISOString() })
+        .eq('matchup_id', matchupId)
+        .eq('player_id', playerId);
+    } catch (err: any) {
+      console.error('Duel image generation error:', err);
+      await supabase
+        .from('duel_submissions')
+        .update({ image_status: 'failed', updated_at: new Date().toISOString() })
+        .eq('matchup_id', matchupId)
+        .eq('player_id', playerId);
+      toast({ title: 'Image failed', description: 'Could not generate that image. Try again.', variant: 'destructive' });
+    } finally {
+      if (currentRound?.id) await fetchDuelSubmissions(currentRound.id);
+    }
+  };
+
+  const handleStartDuelVoting = () => withGuard('startDuelVoting', async () => {
+    if (!isHost || !currentRound?.id) return;
+    const ordered = [...duelMatchups].sort((a, b) => a.matchup_order - b.matchup_order);
+    const first = ordered[0];
+    if (!first) {
+      toast({ title: 'No matchups', description: 'This round has no matchups.', variant: 'destructive' });
+      return;
+    }
+    await supabase.from('duel_matchups').update({ status: 'voting' }).eq('id', first.id);
+    await supabase
+      .from('rounds')
+      .update({ status: 'duel-voting', active_matchup_id: first.id, deadline_at: deadlineFor('duel-voting') })
+      .eq('id', currentRound.id);
+    setCurrentRound(prev => prev ? { ...prev, status: 'duel-voting', active_matchup_id: first.id } : prev);
+    setGameState('duel-voting');
+  });
+
+  const handleDuelVote = async (matchupId: string, votedPlayerId: string) => {
+    if (!playerId || !currentRound?.id) return;
+    setCurrentDuelVote(prev => ({ ...prev, [matchupId]: votedPlayerId }));
+    try {
+      const { error } = await supabase
+        .from('duel_votes')
+        .upsert({
+          matchup_id: matchupId,
+          round_id: currentRound.id,
+          voter_id: playerId,
+          voted_player_id: votedPlayerId,
+        }, { onConflict: 'matchup_id,voter_id' });
+      if (error) throw error;
+    } catch (error: any) {
+      console.error('Duel vote error:', error);
+      toast({ title: 'Error', description: getUserFriendlyErrorMessage(error), variant: 'destructive' });
+    }
+  };
+
+  const handleRevealDuelMatchup = () => withGuard('revealDuelMatchup', async () => {
+    if (!isHost || !currentRound?.active_matchup_id) return;
+    const { error } = await supabase.rpc('finalize_duel_matchup', {
+      p_matchup_id: currentRound.active_matchup_id,
+    });
+    if (error) {
+      toast({ title: 'Error', description: getUserFriendlyErrorMessage(error), variant: 'destructive' });
+      return;
+    }
+    await fetchDuelMatchups(currentRound.id);
+    await fetchPlayers();
+  });
+
+  const handleNextDuelMatchup = () => withGuard('nextDuelMatchup', async () => {
+    if (!isHost || !currentRound?.id) return;
+    const ordered = [...duelMatchups].sort((a, b) => a.matchup_order - b.matchup_order);
+    const activeIdx = ordered.findIndex(m => m.id === currentRound.active_matchup_id);
+    const next = ordered[activeIdx + 1];
+
+    if (next) {
+      await supabase.from('duel_matchups').update({ status: 'voting' }).eq('id', next.id);
+      await supabase
+        .from('rounds')
+        .update({ active_matchup_id: next.id, deadline_at: deadlineFor('duel-voting') })
+        .eq('id', currentRound.id);
+      setCurrentRound(prev => prev ? { ...prev, active_matchup_id: next.id } : prev);
+      await fetchDuelMatchups(currentRound.id);
+    } else {
+      // All matchups revealed → round complete → scoreboard.
+      await supabase
+        .from('rounds')
+        .update({ status: 'duel-complete', active_matchup_id: null })
+        .eq('id', currentRound.id);
+      setCurrentRound(prev => prev ? { ...prev, status: 'duel-complete' } : prev);
+      await fetchPlayers();
+      setGameState('scoreboard');
+    }
+  });
+
+  const handleNextDuelRound = () => withGuard('nextDuelRound', async () => {
+    if (!isHost || !currentRound) return;
+    const nextRoundNumber = currentRound.round_number + 1;
+    if (nextRoundNumber > DUEL_TOTAL_ROUNDS) {
+      toast({ title: 'Final round complete', description: 'That was the last round — check the final scores!' });
+      return;
+    }
+    await startDuelRound(nextRoundNumber);
+  });
+
+  // ============= END DUEL MODE HANDLERS =============
 
   const handlePromptVote = async (promptText: string) => {
     if (!playerId || !currentRound?.id) return;
@@ -2291,7 +2611,9 @@ const Index = () => {
       ? handleStartGameVoting
       : room?.game_mode === 'forgery'
         ? handleStartGameForgery
-        : handleStartGame;
+        : room?.game_mode === 'duel'
+          ? handleStartGameDuel
+          : handleStartGame;
     return (
       <>
         {isHost && (
@@ -2589,6 +2911,25 @@ const Index = () => {
   }
 
   if (gameState === 'scoreboard' && currentRound) {
+    if (room?.game_mode === 'duel') {
+      const maxScore = Math.max(0, ...players.map(p => p.score));
+      const leaderIds = players.filter(p => p.score === maxScore && maxScore > 0).map(p => p.id);
+      const isFinalRound = currentRound.round_number >= DUEL_TOTAL_ROUNDS;
+      return (
+        <Scoreboard
+          players={players}
+          winnerIds={leaderIds}
+          prompt={isFinalRound
+            ? '🏆 Final Results'
+            : `Round ${currentRound.round_number} of ${DUEL_TOTAL_ROUNDS} complete`}
+          gameMode="voting"
+          isHost={isHost}
+          onNextRound={handleNextDuelRound}
+          onEndGame={handleEndGame}
+        />
+      );
+    }
+
     if (room?.game_mode === 'voting') {
       const winningSubmissions = submissions.filter(s => s.is_winner);
       return (
@@ -2632,6 +2973,112 @@ const Index = () => {
         isHost={isHost}
         onNextRound={handleNextRound}
         onEndGame={handleEndGame}
+      />
+    );
+  }
+
+  if (gameState === 'duel-submitting' && currentRound) {
+    const pointsPerVote = duelPointsForRound(currentRound.round_number);
+    if (isHost) {
+      const totalExpected = duelMatchups.length * 2;
+      return (
+        <>
+          <Button onClick={handleEndGame} variant="destructive" size="sm" className="fixed top-4 left-4 z-50 shadow-lg">
+            End Game
+          </Button>
+          <HostDuelSubmission
+            players={players}
+            submissions={duelSubmissions.map(s => ({ player_id: s.player_id, image_status: s.image_status }))}
+            totalExpected={totalExpected}
+            roundNumber={currentRound.round_number}
+            pointsPerVote={pointsPerVote}
+            deadlineAt={currentRound.deadline_at}
+            onStartVoting={handleStartDuelVoting}
+          />
+        </>
+      );
+    }
+
+    const myMatchups = duelMatchups
+      .filter(m => m.player_a_id === playerId || m.player_b_id === playerId)
+      .sort((a, b) => a.matchup_order - b.matchup_order)
+      .map(m => ({ id: m.id, prompt_text: m.prompt_text, player_a_id: m.player_a_id, player_b_id: m.player_b_id }));
+    const mySubs = duelSubmissions
+      .filter(s => s.player_id === playerId)
+      .map(s => ({ matchup_id: s.matchup_id, answer_text: s.answer_text, image_url: s.image_url, image_status: s.image_status }));
+
+    return (
+      <DuelSubmission
+        matchups={myMatchups}
+        submissions={mySubs}
+        currentPlayerId={playerId}
+        roundNumber={currentRound.round_number}
+        pointsPerVote={pointsPerVote}
+        deadlineAt={currentRound.deadline_at}
+        onSubmitAnswer={handleDuelAnswerSubmit}
+      />
+    );
+  }
+
+  if (gameState === 'duel-voting' && currentRound) {
+    const ordered = [...duelMatchups].sort((a, b) => a.matchup_order - b.matchup_order);
+    const activeMatchup =
+      ordered.find(m => m.id === currentRound.active_matchup_id) ||
+      ordered.find(m => m.status === 'voting') ||
+      ordered.find(m => m.status !== 'revealed') ||
+      ordered[0];
+
+    if (!activeMatchup) {
+      return (
+        <div className="min-h-screen bg-background flex items-center justify-center">
+          <div className="text-center space-y-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto" />
+            <p className="text-muted-foreground">Loading duel…</p>
+          </div>
+        </div>
+      );
+    }
+
+    const pointsPerVote = duelPointsForRound(currentRound.round_number);
+    const matchupIndex = ordered.findIndex(m => m.id === activeMatchup.id);
+    const matchupSubs = duelSubmissions.filter(s => s.matchup_id === activeMatchup.id);
+    const eligibleVoters = Math.max(0, players.length - 2);
+
+    if (isHost) {
+      return (
+        <>
+          <Button onClick={handleEndGame} variant="destructive" size="sm" className="fixed top-4 left-4 z-50 shadow-lg">
+            End Game
+          </Button>
+          <HostDuelVoting
+            matchup={activeMatchup}
+            submissions={matchupSubs}
+            votes={duelVotes}
+            players={players}
+            roundNumber={currentRound.round_number}
+            pointsPerVote={pointsPerVote}
+            matchupIndex={matchupIndex}
+            totalMatchups={ordered.length}
+            eligibleVoters={eligibleVoters}
+            deadlineAt={currentRound.deadline_at}
+            onReveal={handleRevealDuelMatchup}
+            onNext={handleNextDuelMatchup}
+          />
+        </>
+      );
+    }
+
+    return (
+      <DuelVoting
+        matchup={activeMatchup}
+        submissions={matchupSubs}
+        votes={duelVotes}
+        players={players}
+        currentPlayerId={playerId}
+        currentVote={currentDuelVote[activeMatchup.id] || null}
+        pointsPerVote={pointsPerVote}
+        deadlineAt={currentRound.deadline_at}
+        onVote={handleDuelVote}
       />
     );
   }
