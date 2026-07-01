@@ -70,7 +70,7 @@ export default function FullscreenButton({ className }: FullscreenButtonProps) {
       onClick={toggle}
       variant="secondary"
       size="sm"
-      className={className ?? 'fixed top-4 right-4 z-50 shadow-lg gap-2'}
+      className={className ?? 'fixed top-6 right-6 lg:top-10 lg:right-10 z-50 shadow-lg gap-2'}
       aria-label={isFullscreen ? 'Exit full screen' : 'Enter full screen'}
       title={isFullscreen ? 'Exit full screen' : 'Full screen'}
     >

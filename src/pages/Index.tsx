@@ -2621,7 +2621,7 @@ const Index = () => {
             onClick={handleEndGame}
             variant="destructive"
             size="sm"
-            className="fixed top-4 left-4 z-50 shadow-lg"
+            className="fixed top-6 left-6 lg:top-10 lg:left-10 z-50 shadow-lg"
           >
             End Game
           </Button>
@@ -2670,7 +2670,7 @@ const Index = () => {
             onClick={handleEndGame}
             variant="destructive"
             size="sm"
-            className="fixed top-4 left-4 z-50 shadow-lg"
+            className="fixed top-6 left-6 lg:top-10 lg:left-10 z-50 shadow-lg"
           >
             End Game
           </Button>
@@ -2689,7 +2689,7 @@ const Index = () => {
             onClick={handleEndGame}
             variant="destructive"
             size="sm"
-            className="fixed top-4 left-4 z-50 shadow-lg"
+            className="fixed top-6 left-6 lg:top-10 lg:left-10 z-50 shadow-lg"
           >
             End Game
           </Button>
@@ -2708,7 +2708,7 @@ const Index = () => {
             onClick={handleEndGame}
             variant="destructive"
             size="sm"
-            className="fixed top-4 left-4 z-50 shadow-lg"
+            className="fixed top-6 left-6 lg:top-10 lg:left-10 z-50 shadow-lg"
           >
             End Game
           </Button>
@@ -2735,7 +2735,7 @@ const Index = () => {
             onClick={handleEndGame}
             variant="destructive"
             size="sm"
-            className="fixed top-4 left-4 z-50 shadow-lg"
+            className="fixed top-6 left-6 lg:top-10 lg:left-10 z-50 shadow-lg"
           >
             End Game
           </Button>
@@ -2770,7 +2770,7 @@ const Index = () => {
             onClick={handleEndGame}
             variant="destructive"
             size="sm"
-            className="fixed top-4 left-4 z-50 shadow-lg"
+            className="fixed top-6 left-6 lg:top-10 lg:left-10 z-50 shadow-lg"
           >
             End Game
           </Button>
@@ -2843,7 +2843,7 @@ const Index = () => {
             onClick={handleEndGame}
             variant="destructive"
             size="sm"
-            className="fixed top-4 left-4 z-50 shadow-lg"
+            className="fixed top-6 left-6 lg:top-10 lg:left-10 z-50 shadow-lg"
           >
             End Game
           </Button>
@@ -2983,7 +2983,7 @@ const Index = () => {
       const totalExpected = duelMatchups.length * 2;
       return (
         <>
-          <Button onClick={handleEndGame} variant="destructive" size="sm" className="fixed top-4 left-4 z-50 shadow-lg">
+          <Button onClick={handleEndGame} variant="destructive" size="sm" className="fixed top-6 left-6 lg:top-10 lg:left-10 z-50 shadow-lg">
             End Game
           </Button>
           <HostDuelSubmission
@@ -3047,7 +3047,7 @@ const Index = () => {
     if (isHost) {
       return (
         <>
-          <Button onClick={handleEndGame} variant="destructive" size="sm" className="fixed top-4 left-4 z-50 shadow-lg">
+          <Button onClick={handleEndGame} variant="destructive" size="sm" className="fixed top-6 left-6 lg:top-10 lg:left-10 z-50 shadow-lg">
             End Game
           </Button>
           <HostDuelVoting
@@ -3087,7 +3087,7 @@ const Index = () => {
     return (
       <>
         {isHost && (
-          <Button onClick={handleEndGame} variant="destructive" size="sm" className="fixed top-4 left-4 z-50 shadow-lg">
+          <Button onClick={handleEndGame} variant="destructive" size="sm" className="fixed top-6 left-6 lg:top-10 lg:left-10 z-50 shadow-lg">
             End Game
           </Button>
         )}
@@ -3109,7 +3109,7 @@ const Index = () => {
     if (isHost) {
       return (
         <>
-          <Button onClick={handleEndGame} variant="destructive" size="sm" className="fixed top-4 left-4 z-50 shadow-lg">
+          <Button onClick={handleEndGame} variant="destructive" size="sm" className="fixed top-6 left-6 lg:top-10 lg:left-10 z-50 shadow-lg">
             End Game
           </Button>
           <HostForgeryVoting
