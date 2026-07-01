@@ -189,17 +189,43 @@ const Landing = () => {
         return;
       }
 
-      const { data: player, error } = await supabase
-        .from('players')
-        .insert({
-          room_id: room.id,
-          name: name.trim(),
-          score: 0
-        })
-        .select()
-        .single();
+      const trimmedName = name.trim();
 
-      if (error) throw error;
+      // Reuse an existing player row with this (case-insensitive) name so
+      // rejoining after a refresh lands the player back in their seat.
+      const { data: existingPlayer } = await supabase
+        .from('players')
+        .select('*')
+        .eq('room_id', room.id)
+        .ilike('name', trimmedName)
+        .maybeSingle();
+
+      let player = existingPlayer;
+
+      if (!player) {
+        const { data: created, error } = await supabase
+          .from('players')
+          .insert({
+            room_id: room.id,
+            name: trimmedName,
+            score: 0
+          })
+          .select()
+          .single();
+
+        if (error) {
+          if ((error as { code?: string }).code === '23505') {
+            toast({
+              title: 'Name taken',
+              description: 'Someone in this room is already using that name. Try another.',
+              variant: 'destructive',
+            });
+            return;
+          }
+          throw error;
+        }
+        player = created;
+      }
 
       const codeUpper = code.toUpperCase();
       

@@ -1074,11 +1074,12 @@ const Index = () => {
     }
 
     // First check if player already exists in this room with this name
+    // (case-insensitive match to align with the unique index on lower(name))
     const { data: existingPlayer } = await supabase
       .from('players')
       .select('*')
       .eq('room_id', roomData.id)
-      .eq('name', safeName)
+      .ilike('name', safeName)
       .maybeSingle();
 
     let playerData;
@@ -1855,6 +1856,12 @@ const Index = () => {
   const handleForgeryVote = async (accusedPlayerId: string) => {
     if (!playerId || !currentRound?.id) return;
 
+    // Guard against self-accusation client-side too (DB trigger enforces it).
+    if (accusedPlayerId === playerId) {
+      toast({ title: 'Invalid vote', description: "You can't accuse yourself", variant: 'destructive' });
+      return;
+    }
+
     setCurrentForgeryVote(accusedPlayerId);
 
     try {
@@ -1866,7 +1873,13 @@ const Index = () => {
           accused_player_id: accusedPlayerId
         }, { onConflict: 'round_id,voter_id' });
 
-      if (error) throw error;
+      if (error) {
+        if (error.message?.includes('cannot accuse yourself')) {
+          toast({ title: 'Invalid vote', description: "You can't accuse yourself", variant: 'destructive' });
+          return;
+        }
+        throw error;
+      }
     } catch (error: any) {
       console.error('Forgery vote error:', error);
       toast({ title: 'Error', description: getUserFriendlyErrorMessage(error), variant: 'destructive' });

@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Loader2, EyeOff, Eye } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { getUserFriendlyErrorMessage, logErrorInDev } from '@/lib/errorUtils';
 
 interface ForgeryRoundStartProps {
   roundId: string;
@@ -28,22 +30,31 @@ export default function ForgeryRoundStart({
   const [playerPrompt, setPlayerPrompt] = useState<PlayerPrompt | null>(null);
   const [revealed, setRevealed] = useState(false);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (isHost || !playerId || !roundId) return;
     const fetch = async () => {
       setLoading(true);
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('player_round_prompts')
         .select('prompt_text, is_forger')
         .eq('round_id', roundId)
         .eq('player_id', playerId)
         .maybeSingle();
+      if (error) {
+        logErrorInDev('ForgeryRoundStart fetch', error);
+        toast({
+          title: 'Could not load your prompt',
+          description: getUserFriendlyErrorMessage(error),
+          variant: 'destructive',
+        });
+      }
       setPlayerPrompt(data ?? null);
       setLoading(false);
     };
     fetch();
-  }, [roundId, playerId, isHost]);
+  }, [roundId, playerId, isHost, toast]);
 
   // Host view
   if (isHost) {

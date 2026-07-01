@@ -6,6 +6,7 @@ import { Loader2, Sparkles, User } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { AVATAR_STYLES, AVATAR_PROMPT_PREFIX } from '@/lib/avatars';
+import { isTrustedImageUrl } from '@/lib/imageUrl';
 
 interface AvatarCreatorProps {
   playerId: string;
@@ -47,6 +48,11 @@ export function AvatarCreator({ playerId, roomId, onAvatarSaved }: AvatarCreator
       const url = Array.isArray((data as any).output)
         ? (data as any).output[0]
         : (data as any).output;
+
+      if (!isTrustedImageUrl(url)) {
+        toast({ title: 'Generation failed', description: 'Received an untrusted image URL. Please try again.', variant: 'destructive' });
+        return;
+      }
 
       setPreviewUrl(url);
     } catch (err: any) {

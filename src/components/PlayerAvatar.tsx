@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { isTrustedImageUrl } from "@/lib/imageUrl";
 
 const AVATAR_COLORS = [
   "bg-purple-500",
@@ -49,7 +50,7 @@ export function PlayerAvatar({
 }: PlayerAvatarProps) {
   const sizeClass = SIZE_CLASSES[size];
 
-  if (avatarUrl) {
+  if (avatarUrl && isTrustedImageUrl(avatarUrl)) {
     return (
       <img
         src={avatarUrl}

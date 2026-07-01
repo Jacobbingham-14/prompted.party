@@ -79,18 +79,42 @@ export default function Join() {
         return;
       }
 
-      // Create player
-      const { data: player, error } = await supabase
+      // Reuse an existing player row with this (case-insensitive) name
+      // so rejoining after a refresh/tab-close lands you back in your seat.
+      const { data: existingPlayer } = await supabase
         .from('players')
-        .insert({
-          room_id: room.id,
-          name: validatedName,
-          score: 0
-        })
-        .select()
-        .single();
+        .select('*')
+        .eq('room_id', room.id)
+        .ilike('name', validatedName)
+        .maybeSingle();
 
-      if (error) throw error;
+      let player = existingPlayer;
+
+      if (!player) {
+        const { data: created, error } = await supabase
+          .from('players')
+          .insert({
+            room_id: room.id,
+            name: validatedName,
+            score: 0
+          })
+          .select()
+          .single();
+
+        if (error) {
+          if ((error as { code?: string }).code === '23505') {
+            toast({
+              title: 'Name taken',
+              description: 'Someone in this room is already using that name. Try another.',
+              variant: 'destructive',
+            });
+            setIsJoining(false);
+            return;
+          }
+          throw error;
+        }
+        player = created;
+      }
 
       // Store game session (matching Index.tsx format)
       localStorage.setItem('playerId', player.id);
