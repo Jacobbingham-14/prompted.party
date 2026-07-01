@@ -634,6 +634,38 @@ const Index = () => {
     fetchPlayerForgeryPrompt(currentRound.id);
   }, [gameState, currentRound?.id, room?.game_mode]);
 
+  // Retry fetching winning submissions if winner-reveal state has no winner yet
+  // (must be a top-level hook, not conditional on render branches below)
+  useEffect(() => {
+    if (gameState !== 'winner-reveal' || !currentRound) return;
+    if (submissions.some(s => s.is_winner)) return;
+
+    const retryFetch = async () => {
+      console.log('Retrying to fetch winning submissions...');
+      await fetchSubmissions(currentRound.id);
+    };
+
+    // Retry every 2 seconds for up to 10 seconds
+    const retryInterval = setInterval(retryFetch, 2000);
+    const timeout = setTimeout(() => {
+      clearInterval(retryInterval);
+      // If still no winners after 10 seconds, show error and go back to scoreboard
+      if (!submissions.some(s => s.is_winner)) {
+        toast({
+          title: 'Error',
+          description: 'Failed to load results. Moving to scoreboard.',
+          variant: 'destructive'
+        });
+        setGameState('scoreboard');
+      }
+    }, 10000);
+
+    return () => {
+      clearInterval(retryInterval);
+      clearTimeout(timeout);
+    };
+  }, [gameState, currentRound?.id]);
+
   // Host listens for judge's prompt selection broadcast
   useEffect(() => {
     if (!isHost || gameState !== 'round-start' || !roomId) return;
@@ -2493,34 +2525,8 @@ const Index = () => {
       );
     }
     
-    // Fallback with retry logic
-    useEffect(() => {
-      const retryFetch = async () => {
-        console.log('Retrying to fetch winning submissions...');
-        await fetchSubmissions(currentRound.id);
-      };
-      
-      // Retry every 2 seconds for up to 10 seconds
-      const retryInterval = setInterval(retryFetch, 2000);
-      const timeout = setTimeout(() => {
-        clearInterval(retryInterval);
-        // If still no winners after 10 seconds, show error and go back to scoreboard
-        if (submissions.filter(s => s.is_winner).length === 0) {
-          toast({
-            title: 'Error',
-            description: 'Failed to load results. Moving to scoreboard.',
-            variant: 'destructive'
-          });
-          setGameState('scoreboard');
-        }
-      }, 10000);
-      
-      return () => {
-        clearInterval(retryInterval);
-        clearTimeout(timeout);
-      };
-    }, [currentRound.id]);
-    
+    // Fallback: the top-level retry-fetch effect (above) will keep polling
+    // for the winner and eventually redirect to scoreboard if none appears.
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center space-y-4">

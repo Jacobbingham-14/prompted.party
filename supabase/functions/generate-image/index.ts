@@ -34,49 +34,62 @@ serve(async (req) => {
       )
     }
 
+    if (!body.roomId || typeof body.roomId !== 'string') {
+      return new Response(
+        JSON.stringify({ error: "Missing required field: roomId is required" }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      )
+    }
+
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    let hostId: string | null = null
+    // Look up host and check generation limit BEFORE calling Replicate
+    const { data: room } = await supabaseAdmin
+      .from('rooms')
+      .select('host_id')
+      .eq('id', body.roomId)
+      .single()
+
+    const hostId: string | null = room?.host_id ?? null
+
+    if (!hostId) {
+      return new Response(
+        JSON.stringify({ error: "Room not found" }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 }
+      )
+    }
+
     let remaining: number | null = null
 
-    // Look up host and check generation limit BEFORE calling Replicate
-    if (body.roomId) {
-      const { data: room } = await supabaseAdmin
-        .from('rooms')
-        .select('host_id')
-        .eq('id', body.roomId)
-        .single()
+    const { data: limitData, error: limitError } = await supabaseAdmin.rpc('check_generation_limit', {
+      p_user_id: hostId
+    })
 
-      hostId = room?.host_id ?? null
-
-      if (hostId) {
-        const { data: limitData, error: limitError } = await supabaseAdmin.rpc('check_generation_limit', {
-          p_user_id: hostId
-        })
-
-        if (limitError) {
-          console.error('Limit check error:', limitError)
-        } else {
-          const limit = Array.isArray(limitData) ? limitData[0] : limitData
-          if (limit && !limit.allowed) {
-            return new Response(
-              JSON.stringify({
-                error: 'Generation limit reached',
-                message: `You have used all ${limit.max_limit} generations for this account.`,
-                limit: limit.max_limit,
-                used: limit.current_count,
-                remaining: 0,
-              }),
-              { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 429 }
-            )
-          }
-          remaining = limit ? Math.max(0, limit.remaining - 1) : null
-        }
-      }
+    if (limitError) {
+      console.error('Limit check error:', limitError)
+      return new Response(
+        JSON.stringify({ error: "Unable to verify generation limit" }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      )
     }
+
+    const limit = Array.isArray(limitData) ? limitData[0] : limitData
+    if (limit && !limit.allowed) {
+      return new Response(
+        JSON.stringify({
+          error: 'Generation limit reached',
+          message: `You have used all ${limit.max_limit} generations for this account.`,
+          limit: limit.max_limit,
+          used: limit.current_count,
+          remaining: 0,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 429 }
+      )
+    }
+    remaining = limit ? Math.max(0, limit.remaining - 1) : null
 
     const replicate = new Replicate({ auth: black_forest_labs_flux_schnell })
 

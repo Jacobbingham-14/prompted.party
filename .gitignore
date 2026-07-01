@@ -6,3 +6,7 @@ dist/
 .DS_Store
 *.log
 npm-debug.log*
+
+# Supabase CLI local state
+supabase/.temp/
+supabase/.branches/
