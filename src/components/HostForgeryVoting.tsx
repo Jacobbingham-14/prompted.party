@@ -1,5 +1,7 @@
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { PlayerAvatar } from '@/components/PlayerAvatar';
+import { useSharedDeadline } from '@/hooks/useSharedDeadline';
 
 interface Player {
   id: string;
@@ -16,9 +18,11 @@ interface HostForgeryVotingProps {
   players: Player[];
   votes: ForgeryVote[];
   onEndVoting: () => void;
+  deadlineAt?: string | null;
 }
 
-export default function HostForgeryVoting({ players, votes, onEndVoting }: HostForgeryVotingProps) {
+export default function HostForgeryVoting({ players, votes, onEndVoting, deadlineAt }: HostForgeryVotingProps) {
+  const { timeLeft } = useSharedDeadline(deadlineAt, 30);
   // Tally votes per accused player
   const voteCounts: Record<string, number> = {};
   for (const vote of votes) {
@@ -40,6 +44,11 @@ export default function HostForgeryVoting({ players, votes, onEndVoting }: HostF
           <p className="text-muted-foreground">
             {votesCast} / {totalVoters} votes cast
           </p>
+          <div className="flex items-center justify-center pt-1">
+            <Badge variant={timeLeft <= 10 ? 'destructive' : 'secondary'} className="px-4 py-2">
+              ⏱️ {timeLeft}s
+            </Badge>
+          </div>
         </div>
 
         <div className="space-y-3">

@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useSharedDeadline } from "@/hooks/useSharedDeadline";
 
 interface Submission {
   id: string;
@@ -30,6 +30,7 @@ interface ImageVotingProps {
   onVote: (submissionId: string) => void;
   presentationOrder: string[];
   tiedImageIds?: string[];
+  deadlineAt?: string | null;
 }
 
 export default function ImageVoting({
@@ -41,16 +42,9 @@ export default function ImageVoting({
   onVote,
   presentationOrder,
   tiedImageIds = [],
+  deadlineAt,
 }: ImageVotingProps) {
-  const [timeLeft, setTimeLeft] = useState(30);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => Math.max(0, prev - 1));
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, []);
+  const { timeLeft } = useSharedDeadline(deadlineAt, 30);
 
   // Show loading state if no presentation order
   if (!presentationOrder || presentationOrder.length === 0) {

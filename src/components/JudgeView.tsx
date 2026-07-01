@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useSharedDeadline } from '@/hooks/useSharedDeadline';
 
 interface Submission {
   id: string;
@@ -14,11 +16,13 @@ interface JudgeViewProps {
   submissions: Submission[];
   onSelectWinner: (submissionId: string) => void;
   roundId: string;
+  deadlineAt?: string | null;
 }
 
-export default function JudgeView({ submissions, onSelectWinner, roundId }: JudgeViewProps) {
+export default function JudgeView({ submissions, onSelectWinner, roundId, deadlineAt }: JudgeViewProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [channelReady, setChannelReady] = useState(false);
+  const { timeLeft } = useSharedDeadline(deadlineAt, 60);
   const currentIndexRef = useRef(currentIndex);
   const channelRef = useRef<any>(null);
 
@@ -172,7 +176,13 @@ export default function JudgeView({ submissions, onSelectWinner, roundId }: Judg
           <div className={`text-sm ${channelReady ? 'text-green-500' : 'text-yellow-500'} font-medium`}>
             {channelReady ? '✓ Connected to host' : '⟳ Connecting to host...'}
           </div>
-          
+
+          <div className="flex items-center justify-center gap-3">
+            <Badge variant={timeLeft <= 10 ? 'destructive' : 'secondary'} className="px-4 py-2 text-base">
+              ⏱️ {timeLeft}s
+            </Badge>
+          </div>
+
           <div className="text-2xl font-semibold text-foreground py-4">
             Image {currentIndex + 1} of {submissions.length}
           </div>

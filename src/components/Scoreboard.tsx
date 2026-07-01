@@ -42,9 +42,10 @@ export default function Scoreboard({
 }: ScoreboardProps) {
   const sortedPlayers = [...players].sort((a, b) => b.score - a.score);
   const isMultipleWinners = winnerIds.length > 1;
-  const winnerNames = gameMode === 'voting' 
-    ? winnerIds.map(id => players.find(p => p.id === id)?.name).filter(Boolean)
-    : [winnerName];
+  const winnerNames = gameMode === 'voting'
+    ? (winnerIds.map(id => players.find(p => p.id === id)?.name).filter(Boolean) as string[])
+    : (winnerName ? [winnerName] : []);
+  const displayWinnerText = winnerNames.length > 0 ? winnerNames.join(', ') : '';
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -82,9 +83,11 @@ export default function Scoreboard({
               </div>
             </div>
           ) : (
-            <p className="text-4xl font-bold text-foreground border-4 border-border p-6 rounded-lg bg-card">
-              {winnerName}
-            </p>
+            displayWinnerText && (
+              <p className="text-4xl font-bold text-foreground border-4 border-border p-6 rounded-lg bg-card">
+                {displayWinnerText}
+              </p>
+            )
           )}
 
           {gameMode === 'judge' && nextJudgeName && (

@@ -60,6 +60,7 @@ const Landing = () => {
   const [hostRooms, setHostRooms] = useState<Room[]>([]);
   const [suggestionDialogOpen, setSuggestionDialogOpen] = useState(false);
   const [suggestionForm, setSuggestionForm] = useState({ message: '' });
+  const [isJoining, setIsJoining] = useState(false);
   const [isSubmittingSuggestion, setIsSubmittingSuggestion] = useState(false);
 
   // Handle QR code join
@@ -161,6 +162,8 @@ const Landing = () => {
 
   const handleJoinRoom = async (name: string, code: string) => {
     if (!name.trim() || !code.trim()) return;
+    if (isJoining) return;
+    setIsJoining(true);
 
     try {
       const { data: roomRows } = await supabase.rpc('find_room_by_code', {
@@ -220,6 +223,8 @@ const Landing = () => {
         description: getUserFriendlyErrorMessage(error),
         variant: 'destructive'
       });
+    } finally {
+      setIsJoining(false);
     }
   };
 
@@ -658,10 +663,12 @@ const Landing = () => {
               placeholder="Your name"
               value={playerName}
               onChange={(e) => setPlayerName(e.target.value)}
+              maxLength={50}
+              disabled={isJoining}
               className="h-12 text-lg"
               autoFocus
             />
-            
+
             {/* Room Code - Conditional rendering based on URL parameter */}
             {searchParams.get('code') ? (
               // Code from QR - show as read-only badge
@@ -675,16 +682,18 @@ const Landing = () => {
                 placeholder="Room code"
                 value={roomCode}
                 onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
+                maxLength={12}
+                disabled={isJoining}
                 className="h-12 text-lg"
               />
             )}
-            
-            <Button 
+
+            <Button
               onClick={() => handleJoinRoom(playerName, roomCode)}
-              disabled={!playerName.trim() || !roomCode.trim()}
+              disabled={!playerName.trim() || !roomCode.trim() || isJoining}
               className="w-full h-12 text-lg"
             >
-              Join Room
+              {isJoining ? 'Joining…' : 'Join Room'}
             </Button>
             <Button 
               onClick={() => setMode('marketing')} 

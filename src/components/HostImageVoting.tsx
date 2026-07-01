@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useSharedDeadline } from "@/hooks/useSharedDeadline";
 
 interface Submission {
   id: string;
@@ -27,6 +27,7 @@ interface HostImageVotingProps {
   onSkip: () => void;
   presentationOrder: string[];
   tiedImageIds?: string[];
+  deadlineAt?: string | null;
 }
 
 export default function HostImageVoting({
@@ -36,23 +37,10 @@ export default function HostImageVoting({
   onSkip,
   presentationOrder,
   tiedImageIds = [],
+  deadlineAt,
 }: HostImageVotingProps) {
-  const [timeLeft, setTimeLeft] = useState(30);
-  const [showSkip, setShowSkip] = useState(false);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          setShowSkip(true);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, []);
+  const { timeLeft, expired } = useSharedDeadline(deadlineAt, 30);
+  const showSkip = expired;
 
   const getVotersForSubmission = (submissionId: string) => {
     const voterIds = votes

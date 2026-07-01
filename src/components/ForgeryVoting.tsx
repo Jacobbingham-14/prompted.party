@@ -1,6 +1,8 @@
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { PlayerAvatar } from '@/components/PlayerAvatar';
 import { Check } from 'lucide-react';
+import { useSharedDeadline } from '@/hooks/useSharedDeadline';
 
 interface Player {
   id: string;
@@ -20,6 +22,7 @@ interface ForgeryVotingProps {
   currentPlayerId: string;
   currentVote: string | null; // accused player id
   onVote: (accusedPlayerId: string) => void;
+  deadlineAt?: string | null;
 }
 
 export default function ForgeryVoting({
@@ -28,8 +31,10 @@ export default function ForgeryVoting({
   currentPlayerId,
   currentVote,
   onVote,
+  deadlineAt,
 }: ForgeryVotingProps) {
   const getPlayer = (playerId: string) => players.find((p) => p.id === playerId);
+  const { timeLeft } = useSharedDeadline(deadlineAt, 30);
 
   return (
     <div className="min-h-screen bg-background p-4">
@@ -39,6 +44,11 @@ export default function ForgeryVoting({
           <p className="text-muted-foreground">
             Study the images carefully — one player had a different prompt. Tap to vote.
           </p>
+          <div className="flex items-center justify-center pt-1">
+            <Badge variant={timeLeft <= 10 ? 'destructive' : 'secondary'} className="px-4 py-2">
+              ⏱️ {timeLeft}s
+            </Badge>
+          </div>
           {currentVote && (
             <p className="text-sm text-green-600 dark:text-green-400 font-medium">
               ✓ You voted for {getPlayer(currentVote)?.name}. You can change your vote.

@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useSharedDeadline } from "@/hooks/useSharedDeadline";
 
 interface PromptVotingProps {
   roundNumber: number;
@@ -11,6 +11,7 @@ interface PromptVotingProps {
   onVote: (promptText: string) => void;
   totalPlayers: number;
   votedPlayers: number;
+  deadlineAt?: string | null;
 }
 
 export default function PromptVoting({
@@ -21,23 +22,10 @@ export default function PromptVoting({
   onVote,
   totalPlayers,
   votedPlayers,
+  deadlineAt,
 }: PromptVotingProps) {
-  const [timeLeft, setTimeLeft] = useState(30);
-  const [showSkip, setShowSkip] = useState(false);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          setShowSkip(true);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, []);
+  const { timeLeft, expired } = useSharedDeadline(deadlineAt, 30);
+  const showSkip = expired;
 
   const handleSkip = () => {
     if (currentVote) {

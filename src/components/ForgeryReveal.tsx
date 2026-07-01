@@ -44,9 +44,13 @@ export default function ForgeryReveal({
     voteCounts[vote.accused_player_id] = (voteCounts[vote.accused_player_id] || 0) + 1;
   }
 
-  // Determine if forger escaped (majority didn't vote for any single forger)
+  // Determine outcome. Three cases:
+  //  - noVerdict: nobody voted, so we don't award anyone
+  //  - forgerEscaped: votes were cast but no forger got a majority
+  //  - forgerCaught: at least one forger got a majority of votes
   const totalVotes = votes.length;
-  const forgerEscaped = forgerIds.every((fid) => {
+  const noVerdict = totalVotes === 0;
+  const forgerEscaped = !noVerdict && forgerIds.every((fid) => {
     const forgerVotes = voteCounts[fid] || 0;
     return forgerVotes <= totalVotes / 2;
   });
@@ -160,12 +164,14 @@ export default function ForgeryReveal({
         {step === 3 && (
           <div className="space-y-6 animate-in fade-in duration-500">
             <div className="text-center space-y-2">
-              <div className="text-5xl">{forgerEscaped ? '😈' : '🎉'}</div>
+              <div className="text-5xl">{noVerdict ? '🤷' : forgerEscaped ? '😈' : '🎉'}</div>
               <h1 className="text-3xl font-bold text-foreground">Score Update</h1>
               <p className="text-muted-foreground">
-                {forgerEscaped
-                  ? 'The forger blended in — they earn bonus points!'
-                  : 'The crowd found the forger — voters earn points!'}
+                {noVerdict
+                  ? 'No votes were cast — nobody scores this round.'
+                  : forgerEscaped
+                    ? 'The forger blended in — they earn bonus points!'
+                    : 'The crowd found the forger — voters earn points!'}
               </p>
             </div>
 

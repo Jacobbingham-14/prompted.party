@@ -74,7 +74,23 @@ interface Round {
   selected_prompts: string[] | null;
   winning_submission_ids: string[] | null;
   presentation_order?: string[] | null;
+  deadline_at?: string | null;
 }
+
+const PHASE_DURATION_SECONDS: Record<string, number> = {
+  'prompt-voting': 30,
+  'submitting': 120,
+  'presenting': 0,
+  'image-voting': 30,
+  'judging': 60,
+  'forgery-voting': 30,
+};
+
+const deadlineFor = (phase: string): string | null => {
+  const s = PHASE_DURATION_SECONDS[phase];
+  if (!s) return null;
+  return new Date(Date.now() + s * 1000).toISOString();
+};
 
 interface PromptVote {
   id: string;
@@ -862,6 +878,8 @@ const Index = () => {
 
   const computeForgeryScoreChanges = (forgerIds: string[], votes: ForgeryVote[]): Record<string, number> => {
     const totalVotes = votes.length;
+    // No votes cast → no verdict, no score changes.
+    if (totalVotes === 0) return {};
     const voteCounts: Record<string, number> = {};
     for (const vote of votes) {
       voteCounts[vote.accused_player_id] = (voteCounts[vote.accused_player_id] || 0) + 1;
@@ -1204,9 +1222,10 @@ const Index = () => {
       // Host performs the database update
       const { error } = await supabase
         .from('rounds')
-        .update({ 
+        .update({
           prompt: selectedPrompt,
-          status: 'submitting' 
+          status: 'submitting',
+          deadline_at: deadlineFor('submitting'),
         })
         .eq('id', currentRound.id);
         
@@ -1328,8 +1347,9 @@ const Index = () => {
   const handleStartJudging = () => withGuard('startJudging', async () => {
     if (!currentRound?.id) return;
     console.log('[Host] Start Judging pressed');
-    await supabase.from('rounds').update({ status: 'judging' }).eq('id', currentRound.id);
-    setCurrentRound(prev => prev ? { ...prev, status: 'judging' } : prev);
+    const judgingDeadline = deadlineFor('judging');
+    await supabase.from('rounds').update({ status: 'judging', deadline_at: judgingDeadline }).eq('id', currentRound.id);
+    setCurrentRound(prev => prev ? { ...prev, status: 'judging', deadline_at: judgingDeadline } : prev);
     toast({
       title: 'Judging Started',
       description: 'Judge can now review submissions',
@@ -1455,12 +1475,13 @@ const Index = () => {
         // Create round with prompts
         const { data: roundData, error: roundError } = await supabase
           .from('rounds')
-          .insert({ 
-            room_id: roomId, 
-            round_number: nextRoundNumber, 
+          .insert({
+            room_id: roomId,
+            round_number: nextRoundNumber,
             judge_id: null,
             status: 'prompt-voting',
-            selected_prompts: selectedPrompts
+            selected_prompts: selectedPrompts,
+            deadline_at: deadlineFor('prompt-voting'),
           })
           .select()
           .single();
@@ -1760,7 +1781,8 @@ const Index = () => {
           round_number: 1,
           judge_id: null,
           status: 'prompt-voting',
-          selected_prompts: selectedPrompts
+          selected_prompts: selectedPrompts,
+          deadline_at: deadlineFor('prompt-voting')
         })
         .select()
         .single();
@@ -1964,7 +1986,8 @@ const Index = () => {
         .from('rounds')
         .update({
           prompt: winningPrompt,
-          status: 'submitting'
+          status: 'submitting',
+          deadline_at: deadlineFor('submitting')
         })
         .eq('id', currentRound.id);
         
@@ -2024,9 +2047,9 @@ const Index = () => {
     try {
       await supabase
         .from('rounds')
-        .update({ status: 'image-voting' })
+        .update({ status: 'image-voting', deadline_at: deadlineFor('image-voting') })
         .eq('id', currentRound.id);
-        
+
       setGameState('image-voting');
       
     } catch (error: any) {
@@ -2316,11 +2339,11 @@ const Index = () => {
           >
             End Game
           </Button>
-          <HostPromptVoting roundNumber={currentRound.round_number} prompts={prompts} votes={promptVotes} players={players} onSkip={handlePromptVotingComplete} />
+          <HostPromptVoting roundNumber={currentRound.round_number} prompts={prompts} votes={promptVotes} players={players} onSkip={handlePromptVotingComplete} deadlineAt={currentRound.deadline_at} />
         </>
       );
     }
-    return <PromptVoting roundNumber={currentRound.round_number} prompts={prompts} currentVote={currentPromptVote} voteCounts={calculatePromptVoteCounts()} onVote={handlePromptVote} totalPlayers={players.length} votedPlayers={promptVotes.length} />;
+    return <PromptVoting roundNumber={currentRound.round_number} prompts={prompts} currentVote={currentPromptVote} voteCounts={calculatePromptVoteCounts()} onVote={handlePromptVote} totalPlayers={players.length} votedPlayers={promptVotes.length} deadlineAt={currentRound.deadline_at} />;
   }
 
   if (gameState === 'presenting' && currentRound) {
@@ -2354,18 +2377,19 @@ const Index = () => {
           >
             End Game
           </Button>
-          <HostImageVoting 
-            submissions={submissions} 
-            votes={imageVotes} 
-            players={players} 
-            onSkip={handleImageVotingComplete} 
+          <HostImageVoting
+            submissions={submissions}
+            votes={imageVotes}
+            players={players}
+            onSkip={handleImageVotingComplete}
             presentationOrder={currentRound.presentation_order || []}
             tiedImageIds={tiedImageIds}
+            deadlineAt={currentRound.deadline_at}
           />
         </>
       );
     }
-    return <ImageVoting submissions={submissions} currentVote={currentImageVote} votes={imageVotes} players={players} currentPlayerId={playerId} onVote={handleImageVote} presentationOrder={currentRound.presentation_order || []} tiedImageIds={tiedImageIds} />;
+    return <ImageVoting submissions={submissions} currentVote={currentImageVote} votes={imageVotes} players={players} currentPlayerId={playerId} onVote={handleImageVote} presentationOrder={currentRound.presentation_order || []} tiedImageIds={tiedImageIds} deadlineAt={currentRound.deadline_at} />;
   }
 
   if (gameState === 'round-start' && currentRound) {
@@ -2400,7 +2424,7 @@ const Index = () => {
       const isForgeryModeHost = room?.game_mode === 'forgery';
       const onStartHandler = isForgeryModeHost
         ? async () => {
-            await supabase.from('rounds').update({ status: 'forgery-voting' }).eq('id', currentRound.id);
+            await supabase.from('rounds').update({ status: 'forgery-voting', deadline_at: deadlineFor('forgery-voting') }).eq('id', currentRound.id);
           }
         : isVotingMode
           ? handleStartPresentation
@@ -2472,7 +2496,7 @@ const Index = () => {
   if (gameState === 'judging' && currentRound) {
     // Judge sees the judging interface
     if (isJudge) {
-      return <JudgeView submissions={submissionsWithPlayerNames} onSelectWinner={handleSelectWinner} roundId={currentRound.id} />;
+      return <JudgeView submissions={submissionsWithPlayerNames} onSelectWinner={handleSelectWinner} roundId={currentRound.id} deadlineAt={currentRound.deadline_at} />;
     }
     
     // Host sees synchronized gallery view
@@ -2614,7 +2638,7 @@ const Index = () => {
           playerCount={players.length}
           roundNumber={currentRound.round_number}
           onHostStart={async () => {
-            await supabase.from('rounds').update({ status: 'submitting' }).eq('id', currentRound.id);
+            await supabase.from('rounds').update({ status: 'submitting', deadline_at: deadlineFor('submitting') }).eq('id', currentRound.id);
           }}
         />
       </>
@@ -2632,6 +2656,7 @@ const Index = () => {
             players={players}
             votes={forgeryVotes}
             onEndVoting={handleEndForgeryVoting}
+            deadlineAt={currentRound.deadline_at}
           />
         </>
       );
@@ -2643,6 +2668,7 @@ const Index = () => {
         currentPlayerId={playerId}
         currentVote={currentForgeryVote}
         onVote={handleForgeryVote}
+        deadlineAt={currentRound.deadline_at}
       />
     );
   }

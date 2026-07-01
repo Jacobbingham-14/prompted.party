@@ -11,23 +11,33 @@ export default function AuthCallback() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    let cancelled = false;
+    const timeouts: number[] = [];
+    const schedule = (fn: () => void, ms: number) => {
+      const id = window.setTimeout(fn, ms);
+      timeouts.push(id);
+    };
+
     // Supabase processes the token from the URL hash automatically on client init.
     // We poll for a session to confirm it was established.
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
+      if (cancelled) return;
 
       if (session?.user) {
         sessionStorage.removeItem('pendingVerification');
         setStatus('success');
-        setTimeout(() => navigate('/'), 2000);
+        schedule(() => { if (!cancelled) navigate('/'); }, 2000);
       } else {
         // Give Supabase a moment to process the hash token, then check again
-        setTimeout(async () => {
+        schedule(async () => {
+          if (cancelled) return;
           const { data: { session: retrySession } } = await supabase.auth.getSession();
+          if (cancelled) return;
           if (retrySession?.user) {
             sessionStorage.removeItem('pendingVerification');
             setStatus('success');
-            setTimeout(() => navigate('/'), 2000);
+            schedule(() => { if (!cancelled) navigate('/'); }, 2000);
           } else {
             setStatus('error');
           }
@@ -36,6 +46,11 @@ export default function AuthCallback() {
     };
 
     checkSession();
+
+    return () => {
+      cancelled = true;
+      timeouts.forEach(window.clearTimeout);
+    };
   }, [navigate]);
 
   if (status === 'loading') {
