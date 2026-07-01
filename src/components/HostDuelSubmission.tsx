@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { PlayerAvatar } from '@/components/PlayerAvatar';
+import FullscreenButton from '@/components/FullscreenButton';
 import { useSharedDeadline } from '@/hooks/useSharedDeadline';
 import { Check, Loader2 } from 'lucide-react';
 
@@ -48,6 +49,7 @@ export default function HostDuelSubmission({
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <FullscreenButton />
       <div className="w-full max-w-2xl space-y-6">
         <div className="text-center space-y-2">
           <h1 className="text-4xl font-bold text-foreground">Round {roundNumber}: Writing Answers</h1>

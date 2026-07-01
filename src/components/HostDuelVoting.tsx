@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { PlayerAvatar } from '@/components/PlayerAvatar';
+import FullscreenButton from '@/components/FullscreenButton';
 import { useSharedDeadline } from '@/hooks/useSharedDeadline';
 import { Trophy, ImageOff } from 'lucide-react';
 
@@ -118,6 +119,7 @@ export default function HostDuelVoting({
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
+      <FullscreenButton />
       <div className="w-full max-w-5xl space-y-6">
         <div className="text-center space-y-2">
           <div className="flex items-center justify-center gap-2">

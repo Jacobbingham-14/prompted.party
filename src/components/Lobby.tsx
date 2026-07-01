@@ -3,6 +3,7 @@ import { QRCodeCanvas } from 'qrcode.react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PlayerAvatar } from '@/components/PlayerAvatar';
 import { AvatarCreator } from '@/components/AvatarCreator';
+import FullscreenButton from '@/components/FullscreenButton';
 
 interface Player {
   id: string;
@@ -95,6 +96,7 @@ export default function Lobby({ roomCode, roomId, players, isHost, currentPlayer
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      {isHost && <FullscreenButton />}
       <div className="w-full max-w-2xl space-y-3">
         <div className="text-center space-y-2">
           <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Room Code</h1>
