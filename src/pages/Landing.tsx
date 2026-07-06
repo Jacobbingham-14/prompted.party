@@ -79,6 +79,14 @@ const Landing = () => {
   };
 
   const buyModes = async (payload: Parameters<typeof startCheckout>[0]) => {
+    if (!user) {
+      toast({
+        title: "Please log in first",
+        description: "You need to be signed in to unlock and pay for a game mode.",
+        variant: "destructive",
+      });
+      return;
+    }
     setPurchasing(true);
     try {
       await startCheckout(payload);

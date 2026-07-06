@@ -39,12 +39,18 @@ serve(async (req) => {
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 })
     }
 
+    // Extract the bearer token and validate it explicitly. Calling
+    // supabase.auth.getUser() with no argument tries to read a session from
+    // local storage, which doesn't exist in the Deno edge runtime -- passing
+    // the header alone via `global.headers` is not enough on its own.
+    const jwt = authHeader.replace(/^Bearer\s+/i, '')
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       { global: { headers: { Authorization: authHeader } } }
     )
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    const { data: { user }, error: userError } = await supabase.auth.getUser(jwt)
     if (userError || !user) {
       return new Response(JSON.stringify({ error: 'Not authenticated' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 })

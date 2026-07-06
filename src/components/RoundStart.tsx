@@ -62,10 +62,11 @@ export default function RoundStart({ roundNumber, judgeName, isJudge, roomId, ro
       previousRounds?.map(round => round.prompt?.trim()) || []
     );
     
-    // Fetch all available prompts
+    // Fetch all available prompts (Judge mode's own pool)
     const { data, error } = await supabase
-      .from('prompts')
+      .from('judge_prompts')
       .select('*')
+      .eq('archived', false)
       .limit(100);
 
     if (error) {

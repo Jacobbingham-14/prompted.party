@@ -1603,17 +1603,18 @@ const Index = () => {
     } else {
       // VOTING MODE: Fetch prompts for new round
       try {
-        // Fetch 4 random prompts
+        // Fetch 4 random prompts (Voting mode's own pool)
         const { data: promptsData, error: promptsError } = await supabase
-          .from('prompts')
+          .from('voting_prompts')
           .select('*')
+          .eq('archived', false)
           .limit(100);
-          
+
         if (promptsError) throw promptsError;
-        
+
         const shuffled = promptsData?.sort(() => 0.5 - Math.random()) || [];
         const selectedPrompts = shuffled.slice(0, 4).map(p => p.text);
-        
+
         // Create round with prompts
         const { data: roundData, error: roundError } = await supabase
           .from('rounds')
@@ -1904,17 +1905,18 @@ const Index = () => {
         return;
       }
       
-      // Fetch 4 random prompts
+      // Fetch 4 random prompts (Voting mode's own pool)
       const { data: promptsData, error: promptsError } = await supabase
-        .from('prompts')
+        .from('voting_prompts')
         .select('*')
+        .eq('archived', false)
         .limit(100);
-        
+
       if (promptsError) throw promptsError;
-      
+
       const shuffled = promptsData?.sort(() => 0.5 - Math.random()) || [];
       const selectedPrompts = shuffled.slice(0, 4).map(p => p.text);
-      
+
       // Create first round
       const { data: roundData, error: roundError } = await supabase
         .from('rounds')
