@@ -63,20 +63,10 @@ const Landing = () => {
   const [gameMode, setGameMode] = useState<'judge' | 'voting' | 'forgery' | 'duel'>('judge');
   const [hostRooms, setHostRooms] = useState<Room[]>([]);
   const { owned: ownedModes, loading: ownedModesLoading, refetch: refetchOwnedModes } = usePurchasedGameModes(user?.id);
-  const [bundleMode, setBundleMode] = useState(false);
-  const [bundleSelection, setBundleSelection] = useState<GameMode[]>([]);
   const [purchasing, setPurchasing] = useState(false);
 
   const ALL_MODES: GameMode[] = ['judge', 'voting', 'forgery', 'duel'];
   const allModesOwned = ALL_MODES.every((m) => ownedModes.has(m));
-
-  const toggleBundleSelection = (m: GameMode) => {
-    setBundleSelection((prev) => {
-      if (prev.includes(m)) return prev.filter((x) => x !== m);
-      if (prev.length >= 2) return [prev[1], m]; // keep it capped at 2
-      return [...prev, m];
-    });
-  };
 
   const buyModes = async (payload: Parameters<typeof startCheckout>[0]) => {
     if (!user) {
@@ -639,7 +629,9 @@ const Landing = () => {
           <div className="max-w-2xl mx-auto space-y-6">
             <h1 className="text-4xl font-bold text-center mb-2">Select Game Mode</h1>
             <p className="text-center text-sm text-muted-foreground mb-6">
-              Each mode is a one-time $7 unlock &middot; any 2 for $12 &middot; all 4 for $20
+              {allModesOwned
+                ? 'All game modes unlocked'
+                : 'One-time $19.99 unlock gets all 4 game modes + 1000 image generations'}
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -663,22 +655,21 @@ const Landing = () => {
                   title: 'Forgery Mode',
                   desc: 'Secret agents receive different prompts. Can you spot the forger?',
                   bullets: ['Secret prompt assignments', 'Vote to identify the forger', 'Requires 3+ players'],
-                  badge: 'NEW!',
+                  badge: null,
                 },
                 {
                   id: 'duel' as GameMode,
                   title: 'Prompt Duel',
                   desc: 'Head-to-head matchups. Write the funnier answer, then everyone votes!',
                   bullets: ['Two prompts per player each round', 'One matchup revealed at a time', '3 rounds, rising stakes · 3+ players'],
-                  badge: 'NEW!',
+                  badge: null,
                 },
               ]).map((m) => {
-                const isOwned = ownedModes.has(m.id);
-                const isSelected = bundleMode ? bundleSelection.includes(m.id) : gameMode === m.id;
+                const isSelected = gameMode === m.id;
                 return (
                   <Card
                     key={m.id}
-                    onClick={() => (bundleMode ? toggleBundleSelection(m.id) : setGameMode(m.id))}
+                    onClick={() => setGameMode(m.id)}
                     className={`p-8 cursor-pointer transition-all hover:scale-105 relative ${
                       isSelected ? 'ring-4 ring-primary bg-primary/10' : 'hover:shadow-lg'
                     }`}
@@ -689,11 +680,11 @@ const Landing = () => {
                         {m.badge && (
                           <Badge className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground animate-pulse">{m.badge}</Badge>
                         )}
-                        {isOwned ? (
+                        {allModesOwned ? (
                           <Badge variant="secondary" className="ml-auto">Owned</Badge>
                         ) : (
                           <Badge variant="outline" className="ml-auto gap-1">
-                            <Lock className="w-3 h-3" /> $7
+                            <Lock className="w-3 h-3" />
                           </Badge>
                         )}
                       </div>
@@ -707,17 +698,9 @@ const Landing = () => {
               })}
             </div>
 
-            {!bundleMode && !allModesOwned && (
-              <div className="text-center">
-                <Button variant="link" onClick={() => { setBundleMode(true); setBundleSelection([]); }}>
-                  Want more than one mode? Buy a bundle instead
-                </Button>
-              </div>
-            )}
-
             <div className="flex gap-4">
               <Button
-                onClick={() => (bundleMode ? setBundleMode(false) : setMode(user && hostRooms.length > 0 ? 'active-games' : 'marketing'))}
+                onClick={() => setMode(user && hostRooms.length > 0 ? 'active-games' : 'marketing')}
                 variant="outline"
                 className="flex-1"
                 disabled={purchasing}
@@ -725,33 +708,11 @@ const Landing = () => {
                 Back
               </Button>
 
-              {bundleMode ? (
-                <>
-                  <Button
-                    className="flex-1"
-                    size="lg"
-                    disabled={purchasing || bundleSelection.length !== 2}
-                    onClick={() => buyModes({ type: 'bundle_2', modes: bundleSelection as [GameMode, GameMode] })}
-                  >
-                    {purchasing && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                    Unlock {bundleSelection.length === 2 ? `${bundleSelection.join(' + ')} ` : ''}for $12
-                  </Button>
-                  <Button
-                    className="flex-1"
-                    size="lg"
-                    variant="secondary"
-                    disabled={purchasing || allModesOwned}
-                    onClick={() => buyModes({ type: 'bundle_4' })}
-                  >
-                    {purchasing && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                    Unlock all 4 for $20
-                  </Button>
-                </>
-              ) : ownedModesLoading ? (
+              {ownedModesLoading ? (
                 <Button className="flex-1" size="lg" disabled>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Checking access...
                 </Button>
-              ) : ownedModes.has(gameMode) ? (
+              ) : allModesOwned ? (
                 <Button
                   onClick={() => handleCreateRoom(gameMode)}
                   className="flex-1"
@@ -761,13 +722,13 @@ const Landing = () => {
                 </Button>
               ) : (
                 <Button
-                  onClick={() => buyModes({ type: 'single_mode', modes: [gameMode] })}
+                  onClick={() => buyModes({ type: 'full_access' })}
                   className="flex-1"
                   size="lg"
                   disabled={purchasing}
                 >
                   {purchasing && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                  Unlock {gameMode === 'judge' ? 'Judge' : gameMode === 'voting' ? 'Voting' : gameMode === 'forgery' ? 'Forgery' : 'Prompt Duel'} Mode – $7
+                  Unlock Everything – $19.99
                 </Button>
               )}
             </div>

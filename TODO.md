@@ -1,8 +1,10 @@
 # Prompted.Party — Launch To-Do
 
 ## Payments
-- [ ] Check payments work — complete one real, paid checkout end to end (single mode, a bundle, and a credit pack) and confirm each unlocks correctly on the account.
+- [ ] Check payments work — complete one real, paid checkout end to end ($19.99 full access, and a $5/1000-credit top-up) and confirm each unlocks correctly on the account.
 - [ ] Add promo codes for the first two [users/friends] — free or discounted access codes so early testers don't have to pay. (Not built yet: Stripe Checkout supports discount/promo codes natively, so this is a small addition to `create-checkout-session` plus enabling promo codes on the Stripe Checkout session.)
+- [x] Pricing model switched to one product: $19.99 unlocks all 4 game modes + 1000 image generations included. Old per-mode ($7) and bundle ($12/$20) pricing removed.
+- [x] Credit top-up switched to $5 per 1000 generations (replaces the old $1/250 pack).
 
 ## Testing
 - [ ] Clayton creates an account (sign up in the app) — once he has, send Jacob the account email so admin access + unlimited generations can be granted.

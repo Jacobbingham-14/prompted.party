@@ -3,9 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 export type GameMode = "judge" | "voting" | "forgery" | "duel";
 
 export type CheckoutRequest =
-  | { type: "single_mode"; modes: [GameMode] }
-  | { type: "bundle_2"; modes: [GameMode, GameMode] }
-  | { type: "bundle_4" }
+  | { type: "full_access" }
   | { type: "credits"; creditPacks: number };
 
 /**

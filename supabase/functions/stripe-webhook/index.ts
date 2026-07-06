@@ -43,7 +43,7 @@ serve(async (req) => {
     const session = event.data.object as Stripe.Checkout.Session
     const metadata = session.metadata ?? {}
     const hostId = metadata.host_id
-    const kind = metadata.kind as 'game_mode' | 'game_mode_bundle' | 'credits' | undefined
+    const kind = metadata.kind as 'full_access' | 'credits' | undefined
 
     if (!hostId || !kind) {
       console.error('Missing metadata on checkout session', session.id)
@@ -69,23 +69,35 @@ serve(async (req) => {
     const amountCents = session.amount_total ?? 0
     const paymentIntentId = typeof session.payment_intent === 'string' ? session.payment_intent : null
 
-    if (kind === 'game_mode' || kind === 'game_mode_bundle') {
+    if (kind === 'full_access') {
       const modes = (metadata.modes ?? '').split(',').filter(Boolean)
-      const { error } = await supabaseAdmin.rpc('grant_game_modes', {
+      const includedCredits = Number(metadata.credits ?? 1000)
+
+      const { error: modesError } = await supabaseAdmin.rpc('grant_game_modes', {
         p_host_id: hostId,
         p_modes: modes,
         p_payment_intent_id: paymentIntentId,
       })
-      if (error) {
-        console.error('grant_game_modes failed:', error)
+      if (modesError) {
+        console.error('grant_game_modes failed:', modesError)
         return new Response(JSON.stringify({ error: 'Failed to grant game modes' }), { status: 500 })
       }
+
+      const { error: creditsError } = await supabaseAdmin.rpc('grant_generation_credits', {
+        p_host_id: hostId,
+        p_amount: includedCredits,
+      })
+      if (creditsError) {
+        console.error('grant_generation_credits failed:', creditsError)
+        return new Response(JSON.stringify({ error: 'Failed to grant included credits' }), { status: 500 })
+      }
+
       await supabaseAdmin.from('purchase_events').insert({
         host_id: hostId,
         stripe_session_id: session.id,
         stripe_payment_intent_id: paymentIntentId,
         kind,
-        detail: { modes },
+        detail: { modes, credits: includedCredits },
         amount_cents: amountCents,
       })
     } else if (kind === 'credits') {

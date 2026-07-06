@@ -1,10 +1,10 @@
 // supabase/functions/create-checkout-session/index.ts
 //
 // Creates a Stripe Checkout Session for one of:
-//   - a single game mode unlock ($7)
-//   - an "any 2" game mode bundle ($12)
-//   - the all-4 game mode bundle ($20)
-//   - an image-generation credit pack (250 credits / $1, any multiple)
+//   - full_access: one-time $19.99 unlock for all 4 game modes + 1000 included
+//     image-generation credits
+//   - credits: an additional image-generation credit pack (1000 credits / $5,
+//     any multiple), for after the included 1000 run out
 //
 // Price IDs come from Stripe (created in the dashboard — see STRIPE_SETUP.md)
 // and are read from env vars so no dollar amounts are hardcoded here.
@@ -57,50 +57,28 @@ serve(async (req) => {
     }
 
     const body = await req.json()
-    // body.type: 'single_mode' | 'bundle_2' | 'bundle_4' | 'credits'
-    // body.modes: string[]  (required for single_mode [len 1] and bundle_2 [len 2])
-    // body.creditPacks: number (required for 'credits' — number of 250-credit packs)
+    // body.type: 'full_access' | 'credits'
+    // body.creditPacks: number (required for 'credits' — number of 1000-credit packs)
 
     let priceId: string
     let mode: 'payment' = 'payment'
     let metadata: Record<string, string> = { host_id: user.id }
 
     switch (body.type) {
-      case 'single_mode': {
-        const gameMode = body.modes?.[0] as GameMode
-        if (!GAME_MODES.includes(gameMode)) {
-          return new Response(JSON.stringify({ error: 'Invalid game mode' }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
-        }
-        const envKey = `STRIPE_PRICE_MODE_${gameMode.toUpperCase()}`
-        priceId = Deno.env.get(envKey) ?? ''
-        metadata = { ...metadata, kind: 'game_mode', modes: gameMode }
-        break
-      }
-      case 'bundle_2': {
-        const modes = (body.modes ?? []) as GameMode[]
-        if (modes.length !== 2 || !modes.every(m => GAME_MODES.includes(m))) {
-          return new Response(JSON.stringify({ error: 'bundle_2 requires exactly 2 valid modes' }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
-        }
-        priceId = Deno.env.get('STRIPE_PRICE_BUNDLE_2') ?? ''
-        metadata = { ...metadata, kind: 'game_mode_bundle', modes: modes.join(',') }
-        break
-      }
-      case 'bundle_4': {
-        priceId = Deno.env.get('STRIPE_PRICE_BUNDLE_4') ?? ''
-        metadata = { ...metadata, kind: 'game_mode_bundle', modes: GAME_MODES.join(',') }
+      case 'full_access': {
+        priceId = Deno.env.get('STRIPE_PRICE_FULL_ACCESS') ?? ''
+        metadata = { ...metadata, kind: 'full_access', modes: GAME_MODES.join(','), credits: '1000' }
         break
       }
       case 'credits': {
         const packs = Number(body.creditPacks)
-        if (!Number.isInteger(packs) || packs < 1 || packs > 40) {
-          // cap at 40 packs (=10,000 credits/$40) per checkout to limit abuse/fat-finger errors
-          return new Response(JSON.stringify({ error: 'creditPacks must be an integer between 1 and 40' }),
+        if (!Number.isInteger(packs) || packs < 1 || packs > 20) {
+          // cap at 20 packs (=20,000 credits/$100) per checkout to limit abuse/fat-finger errors
+          return new Response(JSON.stringify({ error: 'creditPacks must be an integer between 1 and 20' }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
         }
-        priceId = Deno.env.get('STRIPE_PRICE_CREDIT_PACK') ?? '' // price = $1 per 250 credits, quantity = packs
-        metadata = { ...metadata, kind: 'credits', credits: String(packs * 250) }
+        priceId = Deno.env.get('STRIPE_PRICE_CREDIT_PACK') ?? '' // price = $5 per 1000 credits, quantity = packs
+        metadata = { ...metadata, kind: 'credits', credits: String(packs * 1000) }
         break
       }
       default:
