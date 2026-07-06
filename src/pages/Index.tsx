@@ -1026,10 +1026,35 @@ const Index = () => {
       return;
     }
 
+    // Defense-in-depth: the "Create Game" button in Landing.tsx already only appears
+    // for modes the host has purchased, but re-check here in case this is reached any
+    // other way (e.g. handleCreateNewRoom re-launching a mode from an old room).
+    try {
+      const { data: unlock, error: unlockError } = await (supabase as any)
+        .from('purchased_game_modes')
+        .select('game_mode')
+        .eq('host_id', user.id)
+        .eq('game_mode', gameMode)
+        .maybeSingle();
+
+      if (unlockError) {
+        console.error('Error checking game mode purchase:', unlockError);
+      } else if (!unlock) {
+        toast({
+          title: 'Mode not unlocked',
+          description: `You haven't purchased ${gameMode} mode yet. Head back to game mode selection to unlock it.`,
+          variant: 'destructive',
+        });
+        return;
+      }
+    } catch (err) {
+      console.error('Error checking game mode purchase:', err);
+    }
+
     try {
       console.log('User ID:', user.id);
       console.log('Creating room with game mode:', gameMode);
-      
+
       // Check if host already has an active room
       const storedHostRoomId = localStorage.getItem('hostRoomId');
       if (storedHostRoomId) {
