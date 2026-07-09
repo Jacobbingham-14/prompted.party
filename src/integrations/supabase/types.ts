@@ -10,242 +10,10 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "13.0.5"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
-      duel_prompts: {
-        Row: {
-          created_at: string | null
-          id: string
-          text: string
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          text: string
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          text?: string
-        }
-        Relationships: []
-      }
-      duel_matchups: {
-        Row: {
-          created_at: string | null
-          id: string
-          matchup_order: number
-          player_a_id: string
-          player_b_id: string
-          prompt_text: string
-          room_id: string
-          round_id: string
-          status: string
-          winner_player_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          matchup_order: number
-          player_a_id: string
-          player_b_id: string
-          prompt_text: string
-          room_id: string
-          round_id: string
-          status?: string
-          winner_player_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          matchup_order?: number
-          player_a_id?: string
-          player_b_id?: string
-          prompt_text?: string
-          room_id?: string
-          round_id?: string
-          status?: string
-          winner_player_id?: string | null
-        }
-        Relationships: []
-      }
-      duel_submissions: {
-        Row: {
-          answer_text: string
-          created_at: string | null
-          id: string
-          image_status: string
-          image_url: string | null
-          matchup_id: string
-          player_id: string
-          round_id: string
-          updated_at: string | null
-        }
-        Insert: {
-          answer_text: string
-          created_at?: string | null
-          id?: string
-          image_status?: string
-          image_url?: string | null
-          matchup_id: string
-          player_id: string
-          round_id: string
-          updated_at?: string | null
-        }
-        Update: {
-          answer_text?: string
-          created_at?: string | null
-          id?: string
-          image_status?: string
-          image_url?: string | null
-          matchup_id?: string
-          player_id?: string
-          round_id?: string
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-      duel_votes: {
-        Row: {
-          created_at: string | null
-          id: string
-          matchup_id: string
-          round_id: string
-          voted_player_id: string
-          voter_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          matchup_id: string
-          round_id: string
-          voted_player_id: string
-          voter_id: string
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          matchup_id?: string
-          round_id?: string
-          voted_player_id?: string
-          voter_id?: string
-        }
-        Relationships: []
-      }
-      forgery_prompts: {
-        Row: {
-          created_at: string | null
-          forger_prompt: string
-          id: string
-          main_prompt: string
-          set_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          forger_prompt: string
-          id?: string
-          main_prompt: string
-          set_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          forger_prompt?: string
-          id?: string
-          main_prompt?: string
-          set_id?: string | null
-        }
-        Relationships: []
-      }
-      forgery_votes: {
-        Row: {
-          accused_player_id: string
-          created_at: string | null
-          id: string
-          round_id: string
-          voter_id: string
-        }
-        Insert: {
-          accused_player_id: string
-          created_at?: string | null
-          id?: string
-          round_id: string
-          voter_id: string
-        }
-        Update: {
-          accused_player_id?: string
-          created_at?: string | null
-          id?: string
-          round_id?: string
-          voter_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "forgery_votes_round_id_fkey"
-            columns: ["round_id"]
-            isOneToOne: false
-            referencedRelation: "rounds"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "forgery_votes_voter_id_fkey"
-            columns: ["voter_id"]
-            isOneToOne: false
-            referencedRelation: "players"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "forgery_votes_accused_player_id_fkey"
-            columns: ["accused_player_id"]
-            isOneToOne: false
-            referencedRelation: "players"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      player_round_prompts: {
-        Row: {
-          created_at: string | null
-          id: string
-          is_forger: boolean
-          player_id: string
-          prompt_text: string
-          round_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          is_forger?: boolean
-          player_id: string
-          prompt_text: string
-          round_id: string
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          is_forger?: boolean
-          player_id?: string
-          prompt_text?: string
-          round_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "player_round_prompts_round_id_fkey"
-            columns: ["round_id"]
-            isOneToOne: false
-            referencedRelation: "rounds"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "player_round_prompts_player_id_fkey"
-            columns: ["player_id"]
-            isOneToOne: false
-            referencedRelation: "players"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       custom_prompts: {
         Row: {
           created_at: string | null
@@ -290,6 +58,295 @@ export type Database = {
             columns: ["round_id"]
             isOneToOne: false
             referencedRelation: "rounds"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      duel_matchups: {
+        Row: {
+          created_at: string | null
+          id: string
+          matchup_order: number
+          player_a_id: string
+          player_b_id: string
+          prompt_text: string
+          room_id: string
+          round_id: string
+          status: string
+          winner_player_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          matchup_order: number
+          player_a_id: string
+          player_b_id: string
+          prompt_text: string
+          room_id: string
+          round_id: string
+          status?: string
+          winner_player_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          matchup_order?: number
+          player_a_id?: string
+          player_b_id?: string
+          prompt_text?: string
+          room_id?: string
+          round_id?: string
+          status?: string
+          winner_player_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "duel_matchups_player_a_id_fkey"
+            columns: ["player_a_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duel_matchups_player_b_id_fkey"
+            columns: ["player_b_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duel_matchups_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duel_matchups_round_id_fkey"
+            columns: ["round_id"]
+            isOneToOne: false
+            referencedRelation: "rounds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duel_matchups_winner_player_id_fkey"
+            columns: ["winner_player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      duel_prompts: {
+        Row: {
+          archived: boolean
+          category: string[]
+          created_at: string | null
+          id: string
+          text: string
+        }
+        Insert: {
+          archived?: boolean
+          category?: string[]
+          created_at?: string | null
+          id?: string
+          text: string
+        }
+        Update: {
+          archived?: boolean
+          category?: string[]
+          created_at?: string | null
+          id?: string
+          text?: string
+        }
+        Relationships: []
+      }
+      duel_submissions: {
+        Row: {
+          answer_text: string
+          created_at: string | null
+          id: string
+          image_status: string
+          image_url: string | null
+          matchup_id: string
+          player_id: string
+          round_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          answer_text: string
+          created_at?: string | null
+          id?: string
+          image_status?: string
+          image_url?: string | null
+          matchup_id: string
+          player_id: string
+          round_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          answer_text?: string
+          created_at?: string | null
+          id?: string
+          image_status?: string
+          image_url?: string | null
+          matchup_id?: string
+          player_id?: string
+          round_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "duel_submissions_matchup_id_fkey"
+            columns: ["matchup_id"]
+            isOneToOne: false
+            referencedRelation: "duel_matchups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duel_submissions_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duel_submissions_round_id_fkey"
+            columns: ["round_id"]
+            isOneToOne: false
+            referencedRelation: "rounds"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      duel_votes: {
+        Row: {
+          created_at: string | null
+          id: string
+          matchup_id: string
+          round_id: string
+          voted_player_id: string
+          voter_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          matchup_id: string
+          round_id: string
+          voted_player_id: string
+          voter_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          matchup_id?: string
+          round_id?: string
+          voted_player_id?: string
+          voter_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "duel_votes_matchup_id_fkey"
+            columns: ["matchup_id"]
+            isOneToOne: false
+            referencedRelation: "duel_matchups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duel_votes_round_id_fkey"
+            columns: ["round_id"]
+            isOneToOne: false
+            referencedRelation: "rounds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duel_votes_voted_player_id_fkey"
+            columns: ["voted_player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duel_votes_voter_id_fkey"
+            columns: ["voter_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      forgery_prompts: {
+        Row: {
+          archived: boolean
+          category: string[]
+          created_at: string | null
+          forger_prompt: string
+          id: string
+          main_prompt: string
+          set_id: string | null
+        }
+        Insert: {
+          archived?: boolean
+          category?: string[]
+          created_at?: string | null
+          forger_prompt: string
+          id?: string
+          main_prompt: string
+          set_id?: string | null
+        }
+        Update: {
+          archived?: boolean
+          category?: string[]
+          created_at?: string | null
+          forger_prompt?: string
+          id?: string
+          main_prompt?: string
+          set_id?: string | null
+        }
+        Relationships: []
+      }
+      forgery_votes: {
+        Row: {
+          accused_player_id: string
+          created_at: string | null
+          id: string
+          round_id: string
+          voter_id: string
+        }
+        Insert: {
+          accused_player_id: string
+          created_at?: string | null
+          id?: string
+          round_id: string
+          voter_id: string
+        }
+        Update: {
+          accused_player_id?: string
+          created_at?: string | null
+          id?: string
+          round_id?: string
+          voter_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "forgery_votes_accused_player_id_fkey"
+            columns: ["accused_player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "forgery_votes_round_id_fkey"
+            columns: ["round_id"]
+            isOneToOne: false
+            referencedRelation: "rounds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "forgery_votes_voter_id_fkey"
+            columns: ["voter_id"]
+            isOneToOne: false
+            referencedRelation: "players"
             referencedColumns: ["id"]
           },
         ]
@@ -354,6 +411,72 @@ export type Database = {
             columns: ["voter_id"]
             isOneToOne: false
             referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      judge_prompts: {
+        Row: {
+          archived: boolean
+          category: string[]
+          created_at: string
+          id: string
+          text: string
+        }
+        Insert: {
+          archived?: boolean
+          category?: string[]
+          created_at?: string
+          id?: string
+          text: string
+        }
+        Update: {
+          archived?: boolean
+          category?: string[]
+          created_at?: string
+          id?: string
+          text?: string
+        }
+        Relationships: []
+      }
+      player_round_prompts: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_forger: boolean
+          player_id: string
+          prompt_text: string
+          round_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_forger?: boolean
+          player_id: string
+          prompt_text: string
+          round_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_forger?: boolean
+          player_id?: string
+          prompt_text?: string
+          round_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_round_prompts_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "player_round_prompts_round_id_fkey"
+            columns: ["round_id"]
+            isOneToOne: false
+            referencedRelation: "rounds"
             referencedColumns: ["id"]
           },
         ]
@@ -450,6 +573,63 @@ export type Database = {
           created_at?: string | null
           id?: string
           text?: string
+        }
+        Relationships: []
+      }
+      purchase_events: {
+        Row: {
+          amount_cents: number
+          created_at: string
+          detail: Json
+          host_id: string
+          id: string
+          kind: string
+          stripe_payment_intent_id: string | null
+          stripe_session_id: string | null
+        }
+        Insert: {
+          amount_cents: number
+          created_at?: string
+          detail?: Json
+          host_id: string
+          id?: string
+          kind: string
+          stripe_payment_intent_id?: string | null
+          stripe_session_id?: string | null
+        }
+        Update: {
+          amount_cents?: number
+          created_at?: string
+          detail?: Json
+          host_id?: string
+          id?: string
+          kind?: string
+          stripe_payment_intent_id?: string | null
+          stripe_session_id?: string | null
+        }
+        Relationships: []
+      }
+      purchased_game_modes: {
+        Row: {
+          game_mode: string
+          host_id: string
+          id: string
+          purchased_at: string
+          stripe_payment_intent_id: string | null
+        }
+        Insert: {
+          game_mode: string
+          host_id: string
+          id?: string
+          purchased_at?: string
+          stripe_payment_intent_id?: string | null
+        }
+        Update: {
+          game_mode?: string
+          host_id?: string
+          id?: string
+          purchased_at?: string
+          stripe_payment_intent_id?: string | null
         }
         Relationships: []
       }
@@ -623,6 +803,7 @@ export type Database = {
           active_games: number
           completed_games: number
           first_game_date: string | null
+          generation_limit: number
           host_id: string
           last_activity_date: string | null
           last_game_date: string | null
@@ -635,6 +816,7 @@ export type Database = {
           active_games?: number
           completed_games?: number
           first_game_date?: string | null
+          generation_limit?: number
           host_id: string
           last_activity_date?: string | null
           last_game_date?: string | null
@@ -647,6 +829,7 @@ export type Database = {
           active_games?: number
           completed_games?: number
           first_game_date?: string | null
+          generation_limit?: number
           host_id?: string
           last_activity_date?: string | null
           last_game_date?: string | null
@@ -678,13 +861,37 @@ export type Database = {
         }
         Relationships: []
       }
+      voting_prompts: {
+        Row: {
+          archived: boolean
+          category: string[]
+          created_at: string
+          id: string
+          text: string
+        }
+        Insert: {
+          archived?: boolean
+          category?: string[]
+          created_at?: string
+          id?: string
+          text: string
+        }
+        Update: {
+          archived?: boolean
+          category?: string[]
+          created_at?: string
+          id?: string
+          text?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
       assign_forgery_roles: {
-        Args: { p_round_id: string; p_room_id: string }
+        Args: { p_room_id: string; p_round_id: string }
         Returns: undefined
       }
       check_generation_limit: {
@@ -697,7 +904,15 @@ export type Database = {
         }[]
       }
       create_duel_matchups: {
-        Args: { p_round_id: string; p_room_id: string }
+        Args: { p_room_id: string; p_round_id: string }
+        Returns: undefined
+      }
+      delete_ended_room: {
+        Args: { p_caller_id: string; p_room_id: string }
+        Returns: undefined
+      }
+      delete_ended_room_service: {
+        Args: { p_room_id: string }
         Returns: undefined
       }
       finalize_duel_matchup: {
@@ -708,16 +923,8 @@ export type Database = {
           player_a_id: string
           player_b_id: string
           points_per_vote: number
-          winner_player_id: string | null
+          winner_player_id: string
         }[]
-      }
-      delete_ended_room: {
-        Args: { p_caller_id: string; p_room_id: string }
-        Returns: undefined
-      }
-      delete_ended_room_service: {
-        Args: { p_room_id: string }
-        Returns: undefined
       }
       find_room_by_code: {
         Args: { room_code: string }
@@ -730,6 +937,18 @@ export type Database = {
           updated_at: string
           user_id: string
         }[]
+      }
+      grant_game_modes: {
+        Args: {
+          p_host_id: string
+          p_modes: string[]
+          p_payment_intent_id: string
+        }
+        Returns: undefined
+      }
+      grant_generation_credits: {
+        Args: { p_amount: number; p_host_id: string }
+        Returns: undefined
       }
       has_role: {
         Args: {
@@ -747,12 +966,12 @@ export type Database = {
         Returns: undefined
       }
       refresh_host_stats: { Args: { p_host_id: string }; Returns: undefined }
-      update_player_avatar: {
-        Args: { p_avatar_url: string; p_player_id: string }
-        Returns: undefined
-      }
       set_round_judge: {
         Args: { p_caller_id: string; p_judge_id: string; p_room_id: string }
+        Returns: undefined
+      }
+      update_player_avatar: {
+        Args: { p_avatar_url: string; p_player_id: string }
         Returns: undefined
       }
     }
@@ -879,7 +1098,7 @@ export type CompositeTypes<
 }
   ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    ? never
     : never
 
 export const Constants = {

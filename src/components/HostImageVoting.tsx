@@ -1,6 +1,4 @@
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { useSharedDeadline } from "@/hooks/useSharedDeadline";
 
 interface Submission {
@@ -64,55 +62,58 @@ export default function HostImageVoting({
   const isRevoting = tiedImageIds && tiedImageIds.length > 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/5 p-4 md:p-8">
-      <div className="max-w-7xl mx-auto space-y-8">
+    <div className="min-h-screen bg-background p-4 md:p-8">
+      <div className="mx-auto max-w-7xl space-y-8">
         <div className="text-center space-y-4">
-          <h1 className="text-4xl md:text-5xl font-bold text-foreground">
-            {isRevoting ? "🔄 Host View: Tie-Breaker Vote" : "Host View: Image Voting"}
+          <p className="font-retro text-xl uppercase tracking-widest text-gal-teal">
+            {isRevoting ? "Tie-breaker — the gavel hovers" : "Paddles up, grab your phone"}
+          </p>
+          <h1 className="font-pixel text-2xl md:text-4xl leading-relaxed">
+            BIDDING IS <span className="text-gal-seal">OPEN</span>
           </h1>
-          <div className="flex items-center justify-center gap-6 text-lg">
-            <Badge variant="secondary" className="px-4 py-2">
-              ⏱️ {timeLeft}s
-            </Badge>
-            <Badge variant="outline" className="px-4 py-2">
-              {votes.length}/{players.length} voted
-            </Badge>
+          <div className="flex flex-wrap items-center justify-center gap-4">
+            <span className="plaque px-4 py-2.5 text-[10px] md:text-xs">
+              TIME {String(timeLeft).padStart(2, "0")}
+            </span>
+            <span className="plaque px-4 py-2.5 text-[10px] md:text-xs">
+              BIDS {votes.length}/{players.length}
+            </span>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 gap-6 md:grid-cols-3 lg:grid-cols-4 md:gap-8">
           {orderedSubmissions.map((submission, index) => {
             const voters = getVotersForSubmission(submission.id);
             return (
-              <Card key={submission.id} className="p-4 relative">
-                <div className="relative">
+              <figure
+                key={submission.id}
+                className="relative animate-px-hop-in space-y-2"
+                style={{ animationDelay: `${index * 80}ms` }}
+              >
+                <figcaption className="font-retro text-center text-lg">
+                  Lot {index + 1}
+                </figcaption>
+                <div className="gilded-frame p-2">
                   <img
                     src={submission.image_url}
-                    alt="Submission"
-                    className="w-full aspect-square object-cover rounded-lg"
+                    alt={`Lot ${index + 1}`}
+                    className="aspect-square w-full border-2 border-ink object-cover"
                   />
-                  {/* Number badge - top left */}
-                  <Badge
-                    className="absolute top-2 left-2 h-12 w-12 rounded-full flex items-center justify-center text-2xl font-bold bg-primary text-primary-foreground"
-                  >
-                    {index + 1}
-                  </Badge>
-                  {/* Vote count badge - top right */}
-                  {voters.length > 0 && (
-                    <Badge
-                      variant="secondary"
-                      className="absolute top-2 right-2"
-                    >
-                      {voters.length} votes
-                    </Badge>
-                  )}
                 </div>
+                <span className="plaque absolute -left-2 top-6 flex h-11 w-11 items-center justify-center text-base">
+                  {index + 1}
+                </span>
                 {voters.length > 0 && (
-                  <div className="mt-2 text-sm text-muted-foreground">
-                    {voters.join(", ")}
-                  </div>
+                  <span className="absolute -right-2 top-6 border-2 border-ink bg-gal-seal px-2.5 py-1.5 font-pixel text-[9px] text-paper">
+                    {voters.length} BID{voters.length === 1 ? "" : "S"}
+                  </span>
                 )}
-              </Card>
+                {voters.length > 0 && (
+                  <p className="font-retro truncate text-center text-base text-muted-foreground">
+                    {voters.join(", ")}
+                  </p>
+                )}
+              </figure>
             );
           })}
         </div>
@@ -120,11 +121,11 @@ export default function HostImageVoting({
         <div className="flex justify-center gap-4">
           {showSkip && (
             <Button onClick={onSkip} size="lg" variant="outline">
-              Skip Voting (End Early)
+              Close bidding early
             </Button>
           )}
-          <Button onClick={onSkip} size="lg" disabled={votes.length === 0}>
-            Complete Voting
+          <Button onClick={onSkip} size="lg" disabled={votes.length === 0} className="h-14 px-10">
+            Bring down the gavel
           </Button>
         </div>
       </div>

@@ -1,6 +1,4 @@
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface Submission {
@@ -30,62 +28,58 @@ export default function HostImagePresentation({
   const isRevoting = tiedImageIds && tiedImageIds.length > 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/5 p-4 md:p-8">
-      <div className="max-w-6xl mx-auto space-y-8">
-        <div className="text-center space-y-4">
-          <h1 className="text-4xl md:text-5xl font-bold text-foreground">
-            {isRevoting ? "🔄 Tie-Breaker Presentation" : "Image Presentation"}
+    <div className="min-h-screen bg-background p-4 md:p-8">
+      <div className="mx-auto max-w-5xl space-y-6">
+        <div className="text-center space-y-3">
+          <p className="font-retro text-xl uppercase tracking-widest text-gal-teal">
+            {isRevoting ? "Tie-breaker — a second viewing" : "Fresh from the studio"}
+          </p>
+          <h1 className="font-pixel text-xl md:text-3xl leading-relaxed">
+            LOT <span className="text-gal-gold">{currentIndex + 1}</span> OF {submissions.length}
           </h1>
-          <Badge variant="secondary" className="px-4 py-2 text-lg">
-            {currentIndex + 1} of {submissions.length}
-          </Badge>
         </div>
 
         {currentSubmission && (
-          <Card className="p-8">
-            <div className="flex flex-col items-center gap-6">
-              <img
-                src={currentSubmission.image_url}
-                alt="Submission"
-                className="max-w-full max-h-[60vh] object-contain rounded-lg"
-              />
-              
-              <div className="space-y-4 w-full">
-                {/* Navigation Controls */}
-                <div className="flex gap-4 justify-center">
-                  <Button
-                    onClick={onPrevious}
-                    disabled={currentIndex === 0}
-                    size="lg"
-                    variant="outline"
-                  >
-                    <ChevronLeft className="w-5 h-5 mr-2" />
-                    Previous
-                  </Button>
-                  
-                  <Button 
-                    onClick={onNext} 
-                    size="lg"
-                    disabled={currentIndex === submissions.length - 1}
-                  >
-                    Next
-                    <ChevronRight className="w-5 h-5 ml-2" />
-                  </Button>
-                </div>
-
-                {/* Start Voting Action - Always Visible */}
-                <div className="flex justify-center pt-4 border-t">
-                  <Button 
-                    onClick={onStartVoting} 
-                    size="lg"
-                    className="min-w-[200px]"
-                  >
-                    Start Voting
-                  </Button>
-                </div>
+          <div className="flex flex-col items-center gap-6">
+            {/* The lot, in its gilded frame */}
+            <div key={currentSubmission.id} className="relative animate-px-hop-in">
+              <div className="gilded-frame p-3 md:p-4">
+                <img
+                  src={currentSubmission.image_url}
+                  alt={`Lot ${currentIndex + 1}`}
+                  className="max-h-[56vh] max-w-full border-2 border-ink object-contain"
+                />
+              </div>
+              <div className="mt-4 flex justify-center">
+                <p className="plaque px-3 py-2 text-[8px] md:text-[9px] leading-relaxed text-center">
+                  LOT {currentIndex + 1} — MIXED PIXELS ON CANVAS, 2026<br />ARTIST TO BE REVEALED
+                </p>
               </div>
             </div>
-          </Card>
+
+            <p className="font-retro text-xl text-muted-foreground">
+              Study it well. Bidding opens shortly<span className="animate-px-blink">_</span>
+            </p>
+
+            <div className="flex flex-wrap items-center justify-center gap-4">
+              <Button onClick={onPrevious} disabled={currentIndex === 0} size="lg" variant="outline">
+                <ChevronLeft className="mr-1 h-5 w-5" />
+                Prev lot
+              </Button>
+              <Button
+                onClick={onNext}
+                size="lg"
+                variant="secondary"
+                disabled={currentIndex === submissions.length - 1}
+              >
+                Next lot
+                <ChevronRight className="ml-1 h-5 w-5" />
+              </Button>
+              <Button onClick={onStartVoting} size="lg" className="h-14 min-w-[220px]">
+                Open bidding
+              </Button>
+            </div>
+          </div>
         )}
       </div>
     </div>

@@ -19,6 +19,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { useGenerationLimit } from "@/hooks/useGenerationLimit";
+import { startCheckout } from "@/lib/checkout";
 
 interface GeneratedImage {
   url: string;
@@ -59,6 +60,27 @@ export const ImageGenerator = ({ onImageReady, onClose, prompt: initialPrompt, r
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { allowed, currentCount, maxLimit, remaining, decrementLocally } = useGenerationLimit(hostId);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [buyingCredits, setBuyingCredits] = useState(false);
+  const isHostViewer = !!hostId && currentUserId === hostId;
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id ?? null));
+  }, []);
+
+  const handleBuyCredits = async (packs: number) => {
+    setBuyingCredits(true);
+    try {
+      await startCheckout({ type: "credits", creditPacks: packs });
+    } catch (err) {
+      toast({
+        title: "Couldn't start checkout",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+      setBuyingCredits(false);
+    }
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -92,11 +114,14 @@ export const ImageGenerator = ({ onImageReady, onClose, prompt: initialPrompt, r
     setShowGenerateButton(false);
 
     try {
-      let seedToUse: number | undefined;
-
-      if (fullPromptChain && !useRemix) {
-        seedToUse = currentSeed;
-      }
+      // Always use a fresh random seed. There's no image-to-image conditioning
+      // here (Replicate only ever gets a text prompt, no reference image), so
+      // reusing a seed across generations doesn't produce "the same shot with
+      // a small tweak" -- it just constrains flux-schnell's diffusion noise,
+      // which collapses subsequent generations toward a near-identical
+      // composition regardless of prompt changes. That's why every image after
+      // a player's first one used to look the same.
+      const seedToUse: number | undefined = undefined;
 
       const { data, error } = await supabase.functions.invoke('generate-image', {
         body: {
@@ -537,7 +562,7 @@ export const ImageGenerator = ({ onImageReady, onClose, prompt: initialPrompt, r
       <div className="border-t bg-card p-4 shrink-0 sticky bottom-0 z-10">
         <div className="max-w-4xl mx-auto">
           {hostId && (
-            <div className="mb-3 space-y-1">
+            <div className="mb-3 space-y-2">
               <div className="flex justify-between text-xs text-muted-foreground">
                 <span>
                   {remaining <= 10 && remaining > 0 && (
@@ -551,6 +576,24 @@ export const ImageGenerator = ({ onImageReady, onClose, prompt: initialPrompt, r
                 <span>{remaining} left</span>
               </div>
               <Progress value={(currentCount / maxLimit) * 100} className="h-1" />
+              {remaining <= 10 && isHostViewer && (
+                <div className="flex justify-end gap-2">
+                  <Button
+                    size="sm"
+                    variant={remaining === 0 ? "default" : "outline"}
+                    disabled={buyingCredits}
+                    onClick={() => handleBuyCredits(1)}
+                  >
+                    {buyingCredits ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : null}
+                    Buy 1,000 more credits – $5
+                  </Button>
+                </div>
+              )}
+              {remaining <= 10 && !isHostViewer && (
+                <p className="text-xs text-muted-foreground text-right">
+                  Running low on image credits — ask the host to top up.
+                </p>
+              )}
             </div>
           )}
           {showGenerateButton && !isGenerating && (

@@ -215,7 +215,11 @@ const Index = () => {
   const urlParams = new URLSearchParams(window.location.search);
   const isModeHost = urlParams.get('mode') === 'host';
   const storedHostRoomId = localStorage.getItem('hostRoomId');
-  const isHostBySession = !!user && room?.host_id === user.id;
+  // Being logged into the account that owns this room does NOT automatically make
+  // this browser tab the host -- that same account might be joining as a player to
+  // test the game (from another device, or the same one). Once a playerId is set
+  // for this tab, defer to that instead of overriding it via account ownership.
+  const isHostBySession = !!user && room?.host_id === user.id && !playerId;
   const isHostByStorage = storedHostRoomId === roomId;
   console.log('[Host Check]', {
     isHostBySession,
@@ -223,6 +227,7 @@ const Index = () => {
     isModeHost,
     user: !!user,
     roomId,
+    playerId,
     storedHostRoomId,
     roomHostId: room?.host_id
   });
@@ -235,10 +240,26 @@ const Index = () => {
   useEffect(() => {
     const initializeGameContext = async () => {
       console.log('[Index] Initializing game context...');
-      
+
+      // An explicit "join as a player" navigation (from Join.tsx / Landing's
+      // join form) always wins over a stale hostRoomId left in localStorage
+      // from a previous hosting session on this same browser/account --
+      // otherwise a host who tries to join a game (their own or someone
+      // else's) gets dropped back into their old host view instead.
+      const incomingLocationState = location.state as { playerId?: string; roomId?: string; roomCode?: string } | null;
+      const isExplicitPlayerJoin = !!(incomingLocationState?.playerId && incomingLocationState?.roomId);
+
+      // Once someone explicitly joins as a player, drop the stale hostRoomId so a
+      // refresh of this tab doesn't fall back into host view. (If this browser is
+      // also actively hosting in a separate tab, that tab keeps its own in-memory
+      // state and is unaffected until it independently reloads.)
+      if (isExplicitPlayerJoin) {
+        localStorage.removeItem('hostRoomId');
+      }
+
       // Check for host room context
       const storedHostRoomId = localStorage.getItem('hostRoomId');
-      if (storedHostRoomId) {
+      if (storedHostRoomId && !isExplicitPlayerJoin) {
         console.log('[Index] Found hostRoomId in localStorage:', storedHostRoomId);
         
         // Fetch the room to verify it exists and is active
@@ -1026,10 +1047,35 @@ const Index = () => {
       return;
     }
 
+    // Defense-in-depth: the "Create Game" button in Landing.tsx already only appears
+    // for modes the host has purchased, but re-check here in case this is reached any
+    // other way (e.g. handleCreateNewRoom re-launching a mode from an old room).
+    try {
+      const { data: unlock, error: unlockError } = await (supabase as any)
+        .from('purchased_game_modes')
+        .select('game_mode')
+        .eq('host_id', user.id)
+        .eq('game_mode', gameMode)
+        .maybeSingle();
+
+      if (unlockError) {
+        console.error('Error checking game mode purchase:', unlockError);
+      } else if (!unlock) {
+        toast({
+          title: 'Mode not unlocked',
+          description: `You haven't purchased ${gameMode} mode yet. Head back to game mode selection to unlock it.`,
+          variant: 'destructive',
+        });
+        return;
+      }
+    } catch (err) {
+      console.error('Error checking game mode purchase:', err);
+    }
+
     try {
       console.log('User ID:', user.id);
       console.log('Creating room with game mode:', gameMode);
-      
+
       // Check if host already has an active room
       const storedHostRoomId = localStorage.getItem('hostRoomId');
       if (storedHostRoomId) {
@@ -1578,17 +1624,18 @@ const Index = () => {
     } else {
       // VOTING MODE: Fetch prompts for new round
       try {
-        // Fetch 4 random prompts
+        // Fetch 4 random prompts (Voting mode's own pool)
         const { data: promptsData, error: promptsError } = await supabase
-          .from('prompts')
+          .from('voting_prompts')
           .select('*')
+          .eq('archived', false)
           .limit(100);
-          
+
         if (promptsError) throw promptsError;
-        
+
         const shuffled = promptsData?.sort(() => 0.5 - Math.random()) || [];
         const selectedPrompts = shuffled.slice(0, 4).map(p => p.text);
-        
+
         // Create round with prompts
         const { data: roundData, error: roundError } = await supabase
           .from('rounds')
@@ -1879,17 +1926,18 @@ const Index = () => {
         return;
       }
       
-      // Fetch 4 random prompts
+      // Fetch 4 random prompts (Voting mode's own pool)
       const { data: promptsData, error: promptsError } = await supabase
-        .from('prompts')
+        .from('voting_prompts')
         .select('*')
+        .eq('archived', false)
         .limit(100);
-        
+
       if (promptsError) throw promptsError;
-      
+
       const shuffled = promptsData?.sort(() => 0.5 - Math.random()) || [];
       const selectedPrompts = shuffled.slice(0, 4).map(p => p.text);
-      
+
       // Create first round
       const { data: roundData, error: roundError } = await supabase
         .from('rounds')
