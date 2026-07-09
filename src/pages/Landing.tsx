@@ -1004,9 +1004,6 @@ const Landing = () => {
                     </figure>
                   ))}
                 </div>
-                <span className="wax-seal absolute -right-3 -top-5 z-10 flex h-14 w-14 rotate-6 items-center justify-center text-[7px]">
-                  BIDS
-                </span>
               </div>
             </div>
           </section>
