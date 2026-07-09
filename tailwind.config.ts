@@ -25,6 +25,7 @@ export default {
           velvet: "hsl(var(--gal-velvet))",
           teal: "hsl(var(--gal-teal))",
           marble: "hsl(var(--gal-marble))",
+          seal: "hsl(var(--gal-seal))",
         },
         ink: "hsl(var(--ink))",
         paper: "hsl(var(--paper))",

@@ -5,97 +5,98 @@
 /* ============================================================
    THE PIXEL GALLERY — the Prompted.party design system.
    A prestigious art museum rendered on an 8/16-bit console:
-   ivory walls, gilded pixel frames, engraved brass plaques,
-   and velvet-rope reverence for absolute nonsense.
+   cream walls, gilded pixel frames, salon-style art hangs,
+   and a ticker of distinguished patrons below.
    All colors MUST be HSL.
    ============================================================ */
 
 @layer base {
   :root {
-    /* Gallery walls — warm ivory */
-    --background: 40 42% 94%;
-    --foreground: 220 18% 13%;
+    /* Gallery walls — warm cream */
+    --background: 40 38% 92%;
+    --foreground: 225 15% 10%;
 
-    --card: 40 45% 97%;
-    --card-foreground: 220 18% 13%;
+    --card: 40 45% 96%;
+    --card-foreground: 225 15% 10%;
 
-    --popover: 40 45% 97%;
-    --popover-foreground: 220 18% 13%;
+    --popover: 40 45% 96%;
+    --popover-foreground: 225 15% 10%;
 
     /* Gilded Gold — frames, primary actions */
-    --primary: 42 72% 48%;
-    --primary-foreground: 220 18% 13%;
+    --primary: 42 68% 47%;
+    --primary-foreground: 225 15% 10%;
 
-    /* Velvet Burgundy — the rope, the curtains, secondary actions */
+    /* Velvet Burgundy — the rope, secondary actions */
     --secondary: 348 55% 32%;
     --secondary-foreground: 40 45% 96%;
 
-    --muted: 40 28% 87%;
-    --muted-foreground: 30 12% 38%;
+    --muted: 40 24% 85%;
+    --muted-foreground: 30 10% 36%;
 
     /* Curator Teal — placard accents, info */
-    --accent: 196 48% 26%;
+    --accent: 196 48% 28%;
     --accent-foreground: 40 45% 96%;
 
     --destructive: 0 65% 42%;
     --destructive-foreground: 40 45% 96%;
 
-    --border: 38 22% 74%;
-    --input: 40 30% 90%;
-    --ring: 42 72% 48%;
+    --border: 38 20% 72%;
+    --input: 40 30% 89%;
+    --ring: 42 68% 47%;
 
     /* Sharp corners. The gallery was built in 1988. */
     --radius: 0rem;
 
     /* The vault — raw gallery pigments */
-    --gal-gold: 42 72% 48%;        /* #d2a022 gilding */
-    --gal-gold-light: 45 88% 68%;  /* bevel highlight */
-    --gal-gold-dark: 38 70% 30%;   /* bevel shadow */
-    --gal-velvet: 348 55% 32%;     /* #7f2438 rope */
-    --gal-teal: 196 48% 26%;       /* curator ink */
-    --gal-marble: 40 20% 82%;      /* pedestal gray */
-    --ink: 220 18% 13%;            /* engraving black */
+    --gal-gold: 42 68% 47%;        /* #cd9d1f gilding */
+    --gal-gold-light: 45 85% 66%;  /* bevel highlight */
+    --gal-gold-dark: 38 68% 28%;   /* bevel shadow */
+    --gal-velvet: 348 55% 32%;     /* rope burgundy */
+    --gal-teal: 196 48% 28%;       /* curator ink */
+    --gal-marble: 40 18% 80%;      /* pedestal gray */
+    --gal-seal: 355 72% 42%;       /* auction red */
+    --ink: 225 15% 10%;            /* engraving black */
     --paper: 40 45% 97%;           /* ivory */
 
-    --sidebar-background: 40 40% 92%;
-    --sidebar-foreground: 220 18% 13%;
-    --sidebar-primary: 42 72% 48%;
-    --sidebar-primary-foreground: 220 18% 13%;
-    --sidebar-accent: 40 28% 87%;
-    --sidebar-accent-foreground: 220 18% 13%;
-    --sidebar-border: 38 22% 74%;
-    --sidebar-ring: 42 72% 48%;
+    --sidebar-background: 40 34% 90%;
+    --sidebar-foreground: 225 15% 10%;
+    --sidebar-primary: 42 68% 47%;
+    --sidebar-primary-foreground: 225 15% 10%;
+    --sidebar-accent: 40 24% 85%;
+    --sidebar-accent-foreground: 225 15% 10%;
+    --sidebar-border: 38 20% 72%;
+    --sidebar-ring: 42 68% 47%;
   }
 
-  /* The gallery keeps the lights on. One theme. */
+  /* The gallery keeps its lights on. One theme. */
   .dark {
-    --background: 40 42% 94%;
-    --foreground: 220 18% 13%;
-    --card: 40 45% 97%;
-    --card-foreground: 220 18% 13%;
-    --popover: 40 45% 97%;
-    --popover-foreground: 220 18% 13%;
-    --primary: 42 72% 48%;
-    --primary-foreground: 220 18% 13%;
+    --background: 40 38% 92%;
+    --foreground: 225 15% 10%;
+    --card: 40 45% 96%;
+    --card-foreground: 225 15% 10%;
+    --popover: 40 45% 96%;
+    --popover-foreground: 225 15% 10%;
+    --primary: 42 68% 47%;
+    --primary-foreground: 225 15% 10%;
     --secondary: 348 55% 32%;
     --secondary-foreground: 40 45% 96%;
-    --muted: 40 28% 87%;
-    --muted-foreground: 30 12% 38%;
-    --accent: 196 48% 26%;
+    --muted: 40 24% 85%;
+    --muted-foreground: 30 10% 36%;
+    --accent: 196 48% 28%;
     --accent-foreground: 40 45% 96%;
     --destructive: 0 65% 42%;
     --destructive-foreground: 40 45% 96%;
-    --border: 38 22% 74%;
-    --input: 40 30% 90%;
-    --ring: 42 72% 48%;
-    --sidebar-background: 40 40% 92%;
-    --sidebar-foreground: 220 18% 13%;
-    --sidebar-primary: 42 72% 48%;
-    --sidebar-primary-foreground: 220 18% 13%;
-    --sidebar-accent: 40 28% 87%;
-    --sidebar-accent-foreground: 220 18% 13%;
-    --sidebar-border: 38 22% 74%;
-    --sidebar-ring: 42 72% 48%;
+    --border: 38 20% 72%;
+    --input: 40 30% 89%;
+    --ring: 42 68% 47%;
+    --sidebar-background: 40 34% 90%;
+    --sidebar-foreground: 225 15% 10%;
+    --sidebar-primary: 42 68% 47%;
+    --sidebar-primary-foreground: 225 15% 10%;
+    --sidebar-accent: 40 24% 85%;
+    --sidebar-accent-foreground: 225 15% 10%;
+    --sidebar-border: 38 20% 72%;
+    --sidebar-ring: 42 68% 47%;
   }
 }
 
@@ -113,8 +114,8 @@
     font-size: 1.125rem; /* VT323 needs room to breathe */
     /* Faint wall texture: hairline pixel grid */
     background-image:
-      repeating-linear-gradient(0deg, hsl(var(--ink) / 0.025) 0px, hsl(var(--ink) / 0.025) 1px, transparent 1px, transparent 24px),
-      repeating-linear-gradient(90deg, hsl(var(--ink) / 0.025) 0px, hsl(var(--ink) / 0.025) 1px, transparent 1px, transparent 24px);
+      repeating-linear-gradient(0deg, hsl(var(--ink) / 0.03) 0px, hsl(var(--ink) / 0.03) 1px, transparent 1px, transparent 24px),
+      repeating-linear-gradient(90deg, hsl(var(--ink) / 0.03) 0px, hsl(var(--ink) / 0.03) 1px, transparent 1px, transparent 24px);
   }
 
   h1, h2, h3 {
@@ -142,13 +143,13 @@
   /* Gilded pixel frame: gold bevel + ink outline */
   .gilded-frame {
     background: hsl(var(--paper));
-    border: 8px solid hsl(var(--gal-gold));
+    border: 7px solid hsl(var(--gal-gold));
     box-shadow:
-      0 0 0 3px hsl(var(--ink)),
-      inset 0 0 0 3px hsl(var(--ink)),
-      inset 6px 6px 0 3px hsl(var(--gal-gold-light)),
-      inset -6px -6px 0 3px hsl(var(--gal-gold-dark)),
-      10px 10px 0 0 hsl(var(--ink) / 0.18);
+      0 0 0 2px hsl(var(--ink)),
+      inset 0 0 0 2px hsl(var(--ink)),
+      inset 5px 5px 0 2px hsl(var(--gal-gold-light)),
+      inset -5px -5px 0 2px hsl(var(--gal-gold-dark)),
+      8px 8px 0 0 hsl(var(--ink) / 0.15);
   }
 
   /* Engraved brass plaque */
@@ -160,6 +161,19 @@
     box-shadow:
       inset 2px 2px 0 0 hsl(var(--gal-gold-light)),
       inset -2px -2px 0 0 hsl(var(--gal-gold-dark));
+  }
+
+  /* Wax seal — auction medallion */
+  .wax-seal {
+    font-family: "Press Start 2P", monospace;
+    background: hsl(var(--gal-seal));
+    color: hsl(var(--paper));
+    border: 3px solid hsl(var(--ink));
+    border-radius: 9999px;
+    box-shadow:
+      inset 3px 3px 0 0 hsl(355 75% 55%),
+      inset -3px -3px 0 0 hsl(355 70% 26%),
+      3px 3px 0 0 hsl(var(--ink) / 0.4);
   }
 
   /* Exhibit card: ivory with ink border and gold hard shadow */
@@ -183,7 +197,7 @@
     box-shadow: 0 0 0 0 hsl(var(--ink));
   }
 
-  /* Velvet rope divider: dithered burgundy checker */
+  /* Velvet rope divider: dithered burgundy/gold checker */
   .velvet-rule {
     height: 8px;
     border-top: 2px solid hsl(var(--ink));
@@ -197,11 +211,37 @@
     );
   }
 
-  /* Dithered "canvas" placeholder for fake paintings */
+  /* Ceiling track light fixture */
+  .light-fixture {
+    width: 3.5rem;
+    height: 1.1rem;
+    background: hsl(var(--ink));
+    clip-path: polygon(18% 0%, 82% 0%, 100% 100%, 0% 100%);
+  }
+
+  /* Soft light pool beneath a fixture */
+  .light-pool {
+    background: linear-gradient(
+      180deg,
+      hsl(var(--gal-gold) / 0.22) 0%,
+      hsl(var(--gal-gold) / 0.06) 60%,
+      transparent 100%
+    );
+    clip-path: polygon(32% 0%, 68% 0%, 100% 100%, 0% 100%);
+  }
+
+  /* Patron ticker along the bottom */
+  .ticker-track {
+    display: flex;
+    width: max-content;
+    animation: ticker 26s linear infinite;
+  }
+
+  /* Dithered "canvas" placeholder for the next masterpiece */
   .dither-canvas {
     background-image:
-      repeating-linear-gradient(45deg, hsl(var(--gal-teal) / 0.5) 0px, hsl(var(--gal-teal) / 0.5) 4px, transparent 4px, transparent 8px),
-      repeating-linear-gradient(-45deg, hsl(var(--gal-velvet) / 0.4) 0px, hsl(var(--gal-velvet) / 0.4) 4px, transparent 4px, transparent 8px),
+      repeating-linear-gradient(45deg, hsl(var(--gal-teal) / 0.35) 0px, hsl(var(--gal-teal) / 0.35) 4px, transparent 4px, transparent 8px),
+      repeating-linear-gradient(-45deg, hsl(var(--gal-velvet) / 0.30) 0px, hsl(var(--gal-velvet) / 0.30) 4px, transparent 4px, transparent 8px),
       linear-gradient(hsl(var(--gal-marble)), hsl(var(--gal-marble)));
   }
 }
@@ -226,4 +266,9 @@
 @keyframes px-bounce {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-8px); }
+}
+
+@keyframes ticker {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
 }

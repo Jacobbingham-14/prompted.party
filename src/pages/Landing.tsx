@@ -47,6 +47,149 @@ interface Room {
   host_id: string;
 }
 
+/* ————— The permanent collection: hand-drawn pixel sprites ————— */
+
+type Sprite = { palette: Record<string, string>; rows: string[] };
+
+const SPRITES: Record<string, Sprite> = {
+  banana: {
+    palette: { '.': '#1c2957', '*': '#f8f6ee', y: '#ffd23f', k: '#8a5a1f' },
+    rows: [
+      '..*......*..',
+      '......k.....',
+      '.....ky.*...',
+      '.....yy.....',
+      '....yyy.....',
+      '....yyy..*..',
+      '...yyyy.....',
+      '.*.yyyy.....',
+      '...yyy......',
+      '..yyy...*...',
+      '..ky........',
+      '............',
+    ],
+  },
+  cat: {
+    palette: { '.': '#2f6d4f', t: '#d9a05b', d: '#8a5a2b', g: '#57d13c', p: '#e56a92', w: '#f8f6ee' },
+    rows: [
+      '............',
+      '..t......t..',
+      '..tt....tt..',
+      '..tttttttt..',
+      '.ttdttttdtt.',
+      '.ttgttttgtt.',
+      '.ttttpptttt.',
+      '..tttttttt..',
+      '..t.tttt.t..',
+      '....wwww....',
+      '....wwww....',
+      '............',
+    ],
+  },
+  dino: {
+    palette: { '.': '#cfe6da', g: '#4caf50', k: '#1d1f27', w: '#f8f6ee', p: '#f27ba7' },
+    rows: [
+      '....gggg....',
+      '...gggggg...',
+      '...gkgggg...',
+      '...ggggww...',
+      '...gggggg...',
+      '....gg......',
+      '...ggggg....',
+      '..ggggggg...',
+      '.ppppppppp..',
+      '..pp.pp.pp..',
+      '...gg..gg...',
+      '...kk..kk...',
+    ],
+  },
+  lobster: {
+    palette: { '.': '#f2c9b0', r: '#d63c2e', k: '#1d1f27', w: '#f8f6ee' },
+    rows: [
+      '............',
+      '..rr....rr..',
+      '.rrr....rrr.',
+      '..rr....rr..',
+      '...r....r...',
+      '...rrrrrr...',
+      '..rrrrrrrr..',
+      '...rrrrrr...',
+      '..rrrrrrrr..',
+      '.kwkwkwkwkw.',
+      '.wkwkwkwkwk.',
+      '............',
+    ],
+  },
+  astro: {
+    palette: { '.': '#1c2957', '*': '#f8f6ee', w: '#e8e6e0', b: '#141c33', y: '#ffd23f' },
+    rows: [
+      '..*......*..',
+      '....www.....',
+      '...wwwww....',
+      '...wbbbw....',
+      '...wwwww..*.',
+      '..wwwwwww...',
+      '.*wwwwwww...',
+      '..www.www.y.',
+      '..www.www.y.',
+      '...w...w..y.',
+      '..ww...ww...',
+      '............',
+    ],
+  },
+};
+
+const PixelSprite = ({ name, className }: { name: keyof typeof SPRITES; className?: string }) => {
+  const s = SPRITES[name];
+  const h = s.rows.length;
+  const w = s.rows[0].length;
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} shapeRendering="crispEdges" preserveAspectRatio="none" className={className} aria-hidden>
+      {s.rows.flatMap((row, y) =>
+        row.split('').map((ch, x) => {
+          const fill = s.palette[ch];
+          if (!fill) return null;
+          return <rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} fill={fill} />;
+        })
+      )}
+    </svg>
+  );
+};
+
+const PixelFace = ({ skin, shirt }: { skin: string; shirt: string }) => (
+  <svg viewBox="0 0 8 8" shapeRendering="crispEdges" className="h-6 w-6 shrink-0 border-2 border-ink" aria-hidden>
+    <rect x="0" y="0" width="8" height="8" fill="#efe7d6" />
+    <rect x="1" y="0" width="6" height="2" fill="#3a2a1c" />
+    <rect x="1" y="2" width="6" height="3" fill={skin} />
+    <rect x="2" y="3" width="1" height="1" fill="#1d1f27" />
+    <rect x="5" y="3" width="1" height="1" fill="#1d1f27" />
+    <rect x="0" y="6" width="8" height="2" fill={shirt} />
+  </svg>
+);
+
+const PATRONS = [
+  { name: 'USER #2600', skin: '#e8b48a', shirt: '#2f6d4f' },
+  { name: 'MONET? NO.', skin: '#c68955', shirt: '#7f2438' },
+  { name: 'GLIZZY.EXE', skin: '#f0c9a0', shirt: '#1c2957' },
+  { name: 'DUCHAMP_2', skin: '#a86a3d', shirt: '#cd9d1f' },
+  { name: 'VAN GOGH JR', skin: '#e8b48a', shirt: '#356a75' },
+  { name: 'USER #404', skin: '#c68955', shirt: '#5b3d80' },
+];
+
+const ARTWORKS: {
+  sprite: keyof typeof SPRITES;
+  artist: string;
+  tilt: string;
+  aspect: string;
+  span?: string;
+}[] = [
+  { sprite: 'cat', artist: 'USER #47', tilt: '-rotate-1', aspect: 'aspect-square' },
+  { sprite: 'banana', artist: 'USER #2600', tilt: 'rotate-0', aspect: 'aspect-[3/4]', span: 'lg:row-span-2' },
+  { sprite: 'dino', artist: 'USER #1337', tilt: 'rotate-1', aspect: 'aspect-square' },
+  { sprite: 'astro', artist: 'USER #0001', tilt: 'rotate-1', aspect: 'aspect-square' },
+  { sprite: 'lobster', artist: 'USER #404', tilt: '-rotate-1', aspect: 'aspect-square' },
+];
+
 const Landing = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -441,7 +584,7 @@ const Landing = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className={`min-h-screen bg-background ${mode === 'marketing' ? 'pb-14' : ''}`}>
       {/* Header — gallery signage */}
       <header className="sticky top-0 z-50 w-full border-b-[3px] border-ink bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85">
         <div className="container flex h-16 items-center justify-between">
@@ -790,50 +933,80 @@ const Landing = () => {
       {/* Hero Section */}
       {mode === 'marketing' && (
         <>
-          <section className="container py-20 md:py-28">
-            <div className="flex flex-col items-center text-center space-y-8">
-              <span className="plaque animate-px-hop-in px-4 py-2 text-[10px] tracking-wider">
-                EST. MMXXVI ★ ADMISSION FREE ★ TASTE OPTIONAL
-              </span>
+          <section className="container relative py-10 md:py-14 overflow-hidden">
+            {/* Ceiling track lights */}
+            <div className="pointer-events-none absolute inset-x-0 top-0 hidden justify-around md:flex" aria-hidden>
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="flex flex-col items-center">
+                  <div className="light-fixture" />
+                  <div className="light-pool -mt-px h-36 w-44" />
+                </div>
+              ))}
+            </div>
 
-              <div className="space-y-4">
-                <h1 className="font-pixel text-4xl md:text-6xl lg:text-7xl leading-tight">
-                  PROMPTED
-                </h1>
-                <p className="font-pixel text-xs md:text-sm text-gal-velvet tracking-wide">
+            <div className="relative grid items-center gap-12 pt-8 lg:grid-cols-[5fr_7fr]">
+              {/* Left: headline + framed CTA */}
+              <div className="space-y-7">
+                <span className="plaque inline-block px-3 py-2 text-[9px] tracking-wider">
+                  EST. MMXXVI ★ ADMISSION FREE
+                </span>
+
+                <h1 className="font-pixel text-xl md:text-2xl lg:text-[1.7rem] leading-relaxed">
                   A PRESTIGIOUS GALLERY OF ABSOLUTE NONSENSE
+                </h1>
+
+                <div className="font-retro space-y-1 text-2xl md:text-[1.65rem] leading-snug">
+                  <p>You write the words. The machine paints.</p>
+                  <p>Friends judge.</p>
+                  <p>
+                    The game where <span className="text-gal-seal">bad art wins big</span>.
+                  </p>
+                </div>
+
+                {/* Framed CTA panel */}
+                <div className="gilded-frame inline-block p-5 md:p-6 animate-px-hop-in">
+                  <div className="flex min-w-[250px] flex-col gap-4">
+                    <Button
+                      size="lg"
+                      onClick={() => user ? setMode('create') : navigate('/auth?next=host')}
+                      className="h-14"
+                    >
+                      Host an exhibition
+                    </Button>
+                    <Button size="lg" onClick={() => setMode('join')} className="h-14">
+                      Enter as an artist
+                    </Button>
+                  </div>
+                </div>
+
+                <p className="font-retro text-xl text-muted-foreground">
+                  VOTING ACTIVE — CAST YOUR BIDS<span className="animate-px-blink">_</span>
                 </p>
               </div>
 
-              <p className="font-retro text-2xl md:text-3xl text-muted-foreground max-w-2xl leading-snug">
-                You write the words. The machine paints its masterpiece.
-                Your friends pretend to be critics. The party game where
-                <span className="text-gal-velvet"> bad art wins big</span>.
-              </p>
-
-              {/* The centerpiece: a gilded frame awaiting a masterpiece */}
-              <div className="gilded-frame animate-px-hop-in animation-delay-150 w-full max-w-md p-8 md:p-10">
-                <div className="dither-canvas flex aspect-[4/3] items-center justify-center border-[3px] border-ink">
-                  <p className="font-pixel bg-paper border-2 border-ink px-4 py-3 text-[10px] md:text-xs leading-relaxed">
-                    YOUR MASTERPIECE<br />HERE<span className="animate-px-blink">_</span>
-                  </p>
+              {/* Right: the salon wall */}
+              <div className="relative">
+                <div className="grid grid-cols-2 items-start gap-x-5 gap-y-7 lg:grid-cols-3 lg:gap-x-7">
+                  {ARTWORKS.map((a, i) => (
+                    <figure
+                      key={a.sprite}
+                      className={`animate-px-hop-in space-y-2 ${a.span ?? ''}`}
+                      style={{ animationDelay: `${i * 90}ms` }}
+                    >
+                      <figcaption className="font-retro text-center text-base md:text-lg">
+                        Artist: {a.artist} — 2026
+                      </figcaption>
+                      <div className={`gilded-frame p-2.5 ${a.tilt}`}>
+                        <div className="border-2 border-ink">
+                          <PixelSprite name={a.sprite} className={`block w-full ${a.aspect}`} />
+                        </div>
+                      </div>
+                    </figure>
+                  ))}
                 </div>
-                <div className="mt-4 flex justify-center">
-                  <p className="plaque px-3 py-2 text-[8px] md:text-[9px] leading-relaxed text-center">
-                    "UNTITLED No. 47" — THE MACHINE, 2026<br />MIXED PIXELS ON CANVAS
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-4">
-                <Button size="lg" onClick={() => user ? setMode('create') : navigate('/auth?next=host')} className="h-14 px-8">
-                  <Users className="mr-2 w-5 h-5" />
-                  Host an exhibition
-                </Button>
-                <Button size="lg" variant="outline" onClick={() => setMode('join')} className="h-14 px-8">
-                  <QrCode className="mr-2 w-5 h-5" />
-                  Enter as an artist
-                </Button>
+                <span className="wax-seal absolute -right-3 -top-5 z-10 flex h-14 w-14 rotate-6 items-center justify-center text-[7px]">
+                  BIDS
+                </span>
               </div>
             </div>
           </section>
@@ -870,7 +1043,7 @@ const Landing = () => {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 font-pixel text-sm leading-relaxed">
-                  <Users className="w-5 h-5 text-gal-velvet" />
+                  <Users className="w-5 h-5 text-gal-gold" />
                   FOR CURATORS (HOSTS)
                 </CardTitle>
                 <CardDescription className="font-retro text-lg">Control the game and facilitate the fun</CardDescription>
@@ -900,7 +1073,7 @@ const Landing = () => {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 font-pixel text-sm leading-relaxed">
-                  <GamepadIcon className="w-5 h-5 text-gal-velvet" />
+                  <GamepadIcon className="w-5 h-5 text-gal-gold" />
                   FOR ARTISTS (PLAYERS)
                 </CardTitle>
                 <CardDescription className="font-retro text-lg">Join on your phone for the best mobile experience</CardDescription>
@@ -1108,6 +1281,20 @@ const Landing = () => {
               </div>
             </div>
           </footer>
+
+          {/* Patron ticker — tonight's distinguished guests */}
+          <div className="fixed bottom-0 left-0 right-0 z-40 overflow-hidden border-t-[3px] border-ink bg-ink py-2">
+            <div className="ticker-track">
+              {[...PATRONS, ...PATRONS, ...PATRONS].map((p, i) => (
+                <span key={i} className="mx-5 flex items-center gap-2.5 whitespace-nowrap">
+                  <PixelFace skin={p.skin} shirt={p.shirt} />
+                  <span className="font-pixel text-[10px] text-paper">PLAYER</span>
+                  <span className="font-pixel text-[10px] text-gal-gold">{p.name}</span>
+                  <span className="font-pixel text-[10px] text-gal-seal">★</span>
+                </span>
+              ))}
+            </div>
+          </div>
         </>
       )}
     </div>
