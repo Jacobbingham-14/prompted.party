@@ -3,8 +3,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Sparkles } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { validatePlayerName } from '@/lib/validation';
@@ -142,28 +140,33 @@ export default function Join() {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-md animate-px-hop-in">
         <CardHeader className="text-center space-y-4">
-          <div className="flex items-center justify-center gap-2">
-            <Sparkles className="w-8 h-8 text-primary" />
-            <CardTitle className="text-3xl font-bold">Join Game</CardTitle>
-          </div>
+          <p className="font-retro text-lg uppercase tracking-widest text-gal-teal">★ prompted.party ★</p>
+          <CardTitle className="font-pixel text-base md:text-lg leading-relaxed">
+            SIGN THE<br /><span className="text-gal-gold">GUEST BOOK</span>
+          </CardTitle>
           {roomCode && (
-            <Badge variant="secondary" className="text-lg py-2 px-4">
-              Room Code: {roomCode}
-            </Badge>
+            <div className="flex justify-center gap-1.5" aria-label={`Room code ${roomCode}`}>
+              {roomCode.split('').map((ch, i) => (
+                <span key={i} className="plaque inline-flex h-10 w-10 items-center justify-center text-sm">
+                  {ch}
+                </span>
+              ))}
+            </div>
           )}
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleJoinRoom} className="space-y-4">
+          <form onSubmit={handleJoinRoom} className="space-y-5">
             <div className="space-y-2">
-              <label htmlFor="name" className="text-sm font-medium">
-                Your Name
+              <label htmlFor="name" className="font-pixel text-[9px] text-gal-teal">
+                YOUR ARTIST NAME
               </label>
               <Input
                 id="name"
                 type="text"
-                placeholder="Enter your name"
+                placeholder="e.g. Vincent van No"
+                className="font-retro h-12 rounded-none border-[3px] border-ink text-2xl"
                 value={playerName}
                 onChange={(e) => setPlayerName(e.target.value)}
                 maxLength={50}
@@ -174,13 +177,14 @@ export default function Join() {
 
             {!roomCode && (
               <div className="space-y-2">
-                <label htmlFor="code" className="text-sm font-medium">
-                  Room Code
+                <label htmlFor="code" className="font-pixel text-[9px] text-gal-teal">
+                  ROOM CODE
                 </label>
                 <Input
                   id="code"
                   type="text"
-                  placeholder="Enter room code"
+                  placeholder="ABC123"
+                  className="font-retro h-12 rounded-none border-[3px] border-ink text-2xl uppercase tracking-[0.3em]"
                   value={roomCode}
                   onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
                   maxLength={6}
@@ -191,11 +195,11 @@ export default function Join() {
 
             <Button
               type="submit"
-              className="w-full"
+              className="h-14 w-full"
               size="lg"
               disabled={isJoining || !playerName.trim() || !roomCode.trim()}
             >
-              {isJoining ? 'Joining...' : 'Join Room'}
+              {isJoining ? 'Entering…' : 'Enter the gallery'}
             </Button>
 
             <Button
@@ -205,7 +209,7 @@ export default function Join() {
               onClick={() => navigate('/')}
               disabled={isJoining}
             >
-              Back to Home
+              Back to home
             </Button>
           </form>
         </CardContent>
