@@ -13,7 +13,21 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        pixel: ['"Press Start 2P"', "monospace"],
+        retro: ['"VT323"', "ui-monospace", "monospace"],
+      },
       colors: {
+        gal: {
+          gold: "hsl(var(--gal-gold))",
+          "gold-light": "hsl(var(--gal-gold-light))",
+          "gold-dark": "hsl(var(--gal-gold-dark))",
+          velvet: "hsl(var(--gal-velvet))",
+          teal: "hsl(var(--gal-teal))",
+          marble: "hsl(var(--gal-marble))",
+        },
+        ink: "hsl(var(--ink))",
+        paper: "hsl(var(--paper))",
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
@@ -84,6 +98,9 @@ export default {
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "px-blink": "px-blink 0.9s step-end infinite",
+        "px-hop-in": "px-hop-in 0.3s steps(4) both",
+        "px-bounce": "px-bounce 0.7s steps(2) infinite",
       },
     },
   },

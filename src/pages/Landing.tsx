@@ -2,7 +2,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,9 +29,7 @@ import {
   Briefcase,
   Coffee,
   GamepadIcon,
-  Wifi,
   ArrowRight,
-  Check,
   ChevronDown,
   Mail,
   Lock,
@@ -151,7 +148,7 @@ const Landing = () => {
       .eq('user_id', userId)
       .in('status', ['waiting', 'playing'])
       .order('created_at', { ascending: false });
-    
+
     if (data) {
       setHostRooms(data as Room[]);
     }
@@ -267,7 +264,7 @@ const Landing = () => {
       }
 
       const codeUpper = code.toUpperCase();
-      
+
       // Store session data using separate keys (matching Join.tsx standard)
       localStorage.setItem('playerId', player.id);
       localStorage.setItem('roomId', room.id);
@@ -327,7 +324,7 @@ const Landing = () => {
 
   const handleSuggestionSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Double-check user is logged in
     if (!user) {
       toast({
@@ -337,13 +334,13 @@ const Landing = () => {
       });
       return;
     }
-    
+
     try {
       setIsSubmittingSuggestion(true);
-      
+
       // Validate form
       const validatedData = validateSuggestionForm(suggestionForm);
-      
+
       // Insert with user_id automatically
       const { error } = await supabase
         .from('suggestions')
@@ -352,18 +349,18 @@ const Landing = () => {
           message: validatedData.message,
           status: 'new'
         }]);
-      
+
       if (error) throw error;
-      
+
       toast({
         title: "Suggestion sent!",
         description: "Thank you for your feedback. We'll review it shortly.",
       });
-      
+
       // Reset form and close dialog
       setSuggestionForm({ message: '' });
       setSuggestionDialogOpen(false);
-      
+
     } catch (error: any) {
       logErrorInDev('Submit suggestion error', error);
       toast({
@@ -445,48 +442,48 @@ const Landing = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      {/* Header — gallery signage */}
+      <header className="sticky top-0 z-50 w-full border-b-[3px] border-ink bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85">
         <div className="container flex h-16 items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-6 h-6 text-primary" />
-            <span className="font-bold text-xl">Prompted</span>
-            
+          <div className="flex items-center gap-3">
+            <span className="plaque px-2 py-1.5 text-[10px]">▦</span>
+            <span className="font-pixel text-sm">PROMPTED</span>
+
             {/* Suggestions Button */}
             <Dialog open={suggestionDialogOpen} onOpenChange={setSuggestionDialogOpen}>
               <DialogTrigger asChild>
               <Button variant="ghost" size="sm" className="ml-2 text-muted-foreground hover:text-foreground">
                 <Mail className="w-4 h-4 md:mr-1" />
-                <span className="hidden md:inline">Suggestions or Prompt Ideas?</span>
+                <span className="hidden md:inline">Suggestion box</span>
               </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[500px]">
+              <DialogContent className="sm:max-w-[500px] rounded-none exhibit-card">
                 <DialogHeader>
-                  <DialogTitle>Share Your Suggestions or Prompt Ideas</DialogTitle>
+                  <DialogTitle className="font-pixel text-sm leading-relaxed">LEAVE A NOTE FOR THE CURATOR</DialogTitle>
                 </DialogHeader>
-                
+
                 {!user ? (
                   // Show login prompt if not authenticated
                   <div className="space-y-4 mt-4 text-center py-8">
-                    <p className="text-muted-foreground">
+                    <p className="font-retro text-xl text-muted-foreground">
                       Please log in to submit suggestions and prompt ideas.
                     </p>
                     <Button onClick={() => {
                       setSuggestionDialogOpen(false);
                       navigate('/auth');
                     }}>
-                      Log In to Submit
+                      Log in to submit
                     </Button>
                   </div>
                 ) : (
                   // Show form if authenticated
                   <form onSubmit={handleSuggestionSubmit} className="space-y-4 mt-4">
-                    <div className="text-sm text-muted-foreground">
-                      Submitting as: <span className="font-medium text-foreground">{user.email}</span>
+                    <div className="font-retro text-lg text-muted-foreground">
+                      Submitting as: <span className="text-foreground">{user.email}</span>
                     </div>
-                    
+
                     <div>
-                      <Label htmlFor="suggestion-message">Your Suggestion or Prompt Idea</Label>
+                      <Label htmlFor="suggestion-message" className="font-pixel text-[10px]">YOUR SUGGESTION OR PROMPT IDEA</Label>
                       <Textarea
                         id="suggestion-message"
                         placeholder="Share your ideas for new prompts or suggestions to improve the game..."
@@ -496,13 +493,13 @@ const Landing = () => {
                         minLength={10}
                         maxLength={2000}
                         rows={8}
-                        className="resize-none"
+                        className="resize-none rounded-none border-[3px] border-ink font-retro text-lg mt-2"
                       />
-                      <p className="text-xs text-muted-foreground mt-1">
+                      <p className="font-retro text-base text-muted-foreground mt-1">
                         {suggestionForm.message.length}/2000 characters
                       </p>
                     </div>
-                    
+
                     <div className="flex justify-end gap-2">
                       <Button
                         type="button"
@@ -513,7 +510,7 @@ const Landing = () => {
                         Cancel
                       </Button>
                       <Button type="submit" disabled={isSubmittingSuggestion}>
-                        {isSubmittingSuggestion ? "Sending..." : "Send Suggestion"}
+                        {isSubmittingSuggestion ? "Sending..." : "Send"}
                       </Button>
                     </div>
                   </form>
@@ -525,13 +522,13 @@ const Landing = () => {
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="gap-1">
+                  <Button variant="ghost" className="gap-1 font-retro text-lg normal-case">
                     {user.email}
                     <ChevronDown className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="bg-popover">
-                  <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
+                <DropdownMenuContent className="bg-popover rounded-none border-[3px] border-ink">
+                  <DropdownMenuItem onClick={handleLogout} className="cursor-pointer font-retro text-lg">
                     Log Out
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -559,31 +556,31 @@ const Landing = () => {
       {mode === 'active-games' && user && hostRooms.length > 0 && (
         <section className="container py-24">
           <div className="max-w-md mx-auto space-y-4">
-            <h1 className="text-3xl font-bold text-center mb-4">Your Active Games</h1>
-            
+            <h1 className="font-pixel text-xl text-center mb-4 leading-relaxed">YOUR ACTIVE EXHIBITIONS</h1>
+
             <div className="space-y-3">
               {hostRooms.map(room => (
                 <Card key={room.id}>
                   <CardContent className="p-4">
                     <div className="flex justify-between items-center">
                       <div>
-                        <p className="text-xl font-bold">{room.code}</p>
-                        <p className="text-sm text-muted-foreground capitalize">
+                        <p className="font-pixel text-base">{room.code}</p>
+                        <p className="font-retro text-lg text-muted-foreground capitalize">
                           {room.status}
                         </p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="font-retro text-base text-muted-foreground">
                           {new Date(room.created_at).toLocaleDateString()}
                         </p>
                       </div>
                       <div className="flex gap-2">
-                        <Button 
+                        <Button
                           onClick={() => handleContinueRoom(room.id)}
                           size="sm"
                         >
                           Continue
                         </Button>
-                        <Button 
-                          variant="destructive" 
+                        <Button
+                          variant="destructive"
                           size="sm"
                           onClick={() => handleEndRoom(room.id)}
                         >
@@ -595,7 +592,7 @@ const Landing = () => {
                 </Card>
               ))}
             </div>
-            
+
             <Button
               onClick={() => user ? setMode('create') : navigate('/auth?next=host')}
               className="w-full"
@@ -603,17 +600,17 @@ const Landing = () => {
             >
               Create New Game
             </Button>
-            
-            <Button 
-              onClick={() => setMode('join')} 
+
+            <Button
+              onClick={() => setMode('join')}
               className="w-full"
               variant="secondary"
             >
               Join Game
             </Button>
-            
-            <Button 
-              onClick={() => setMode('marketing')} 
+
+            <Button
+              onClick={() => setMode('marketing')}
               variant="outline"
               className="w-full"
             >
@@ -627,8 +624,8 @@ const Landing = () => {
       {mode === 'create' && (
         <section className="container py-24">
           <div className="max-w-2xl mx-auto space-y-6">
-            <h1 className="text-4xl font-bold text-center mb-2">Select Game Mode</h1>
-            <p className="text-center text-sm text-muted-foreground mb-6">
+            <h1 className="font-pixel text-2xl text-center mb-2 leading-relaxed">SELECT GAME MODE</h1>
+            <p className="font-retro text-center text-xl text-muted-foreground mb-6">
               {allModesOwned
                 ? 'All game modes unlocked'
                 : 'One-time $19.99 unlock gets all 4 game modes + 1000 image generations'}
@@ -670,27 +667,27 @@ const Landing = () => {
                   <Card
                     key={m.id}
                     onClick={() => setGameMode(m.id)}
-                    className={`p-8 cursor-pointer transition-all hover:scale-105 relative ${
-                      isSelected ? 'ring-4 ring-primary bg-primary/10' : 'hover:shadow-lg'
+                    className={`p-8 cursor-pointer relative ${
+                      isSelected ? 'ring-4 ring-primary bg-primary/10' : ''
                     }`}
                   >
                     <CardContent className="p-0 space-y-4">
                       <div className="flex items-center gap-2">
-                        <h3 className="font-bold text-2xl">{m.title}</h3>
+                        <h3 className="font-pixel text-sm leading-relaxed">{m.title}</h3>
                         {m.badge && (
-                          <Badge className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground animate-pulse">{m.badge}</Badge>
+                          <Badge className="bg-primary text-primary-foreground">{m.badge}</Badge>
                         )}
                         {allModesOwned ? (
-                          <Badge variant="secondary" className="ml-auto">Owned</Badge>
+                          <Badge variant="secondary" className="ml-auto rounded-none">Owned</Badge>
                         ) : (
-                          <Badge variant="outline" className="ml-auto gap-1">
+                          <Badge variant="outline" className="ml-auto gap-1 rounded-none border-ink">
                             <Lock className="w-3 h-3" />
                           </Badge>
                         )}
                       </div>
-                      <p className="text-muted-foreground">{m.desc}</p>
-                      <ul className="text-sm text-muted-foreground space-y-1">
-                        {m.bullets.map((b) => <li key={b}>• {b}</li>)}
+                      <p className="font-retro text-xl text-muted-foreground">{m.desc}</p>
+                      <ul className="font-retro text-lg text-muted-foreground space-y-1">
+                        {m.bullets.map((b) => <li key={b}>▸ {b}</li>)}
                       </ul>
                     </CardContent>
                   </Card>
@@ -740,8 +737,8 @@ const Landing = () => {
       {mode === 'join' && (
         <section className="container py-24">
           <div className="max-w-md mx-auto space-y-4">
-            <h1 className="text-3xl font-bold text-center mb-4">Join Game</h1>
-            
+            <h1 className="font-pixel text-xl text-center mb-4 leading-relaxed">SIGN THE GUEST BOOK</h1>
+
             {/* Name Input - Always shown */}
             <Input
               placeholder="Your name"
@@ -749,16 +746,16 @@ const Landing = () => {
               onChange={(e) => setPlayerName(e.target.value)}
               maxLength={50}
               disabled={isJoining}
-              className="h-12 text-lg"
+              className="h-12 rounded-none border-[3px] border-ink font-retro text-2xl"
               autoFocus
             />
 
             {/* Room Code - Conditional rendering based on URL parameter */}
             {searchParams.get('code') ? (
               // Code from QR - show as read-only badge
-              <div className="p-4 bg-muted rounded-lg border-2 border-border text-center">
-                <p className="text-sm text-muted-foreground mb-1">Joining room:</p>
-                <p className="text-2xl font-bold tracking-widest text-foreground">{roomCode}</p>
+              <div className="p-4 exhibit-card text-center">
+                <p className="font-retro text-lg text-muted-foreground mb-1">Joining exhibition:</p>
+                <p className="font-pixel text-xl tracking-widest">{roomCode}</p>
               </div>
             ) : (
               // Manual join - show editable input
@@ -768,19 +765,19 @@ const Landing = () => {
                 onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
                 maxLength={12}
                 disabled={isJoining}
-                className="h-12 text-lg"
+                className="h-12 rounded-none border-[3px] border-ink font-retro text-2xl tracking-[0.3em] uppercase"
               />
             )}
 
             <Button
               onClick={() => handleJoinRoom(playerName, roomCode)}
               disabled={!playerName.trim() || !roomCode.trim() || isJoining}
-              className="w-full h-12 text-lg"
+              className="w-full h-12"
             >
-              {isJoining ? 'Joining…' : 'Join Room'}
+              {isJoining ? 'Joining…' : 'Enter the gallery'}
             </Button>
-            <Button 
-              onClick={() => setMode('marketing')} 
+            <Button
+              onClick={() => setMode('marketing')}
               variant="outline"
               className="w-full"
             >
@@ -793,44 +790,66 @@ const Landing = () => {
       {/* Hero Section */}
       {mode === 'marketing' && (
         <>
-          <section className="container py-24 md:py-32">
+          <section className="container py-20 md:py-28">
             <div className="flex flex-col items-center text-center space-y-8">
-              <Badge variant="secondary" className="text-sm">
-                <Sparkles className="w-3 h-3 mr-1" />
-                Powered by AI
-              </Badge>
-              <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight">
-                <span className="text-primary text-5xl md:text-7xl lg:text-8xl block mb-2">Prompted</span>
-                <span className="text-2xl md:text-4xl lg:text-5xl block text-foreground">The AI Image Party Game</span>
-              </h1>
-              <p className="text-xl text-muted-foreground max-w-2xl">
-                A multiplayer party game where <span className="text-primary font-semibold">creativity meets AI</span>. Players use AI to create images based on creative prompts, then vote on the best submissions to earn points.
+              <span className="plaque animate-px-hop-in px-4 py-2 text-[10px] tracking-wider">
+                EST. MMXXVI ★ ADMISSION FREE ★ TASTE OPTIONAL
+              </span>
+
+              <div className="space-y-4">
+                <h1 className="font-pixel text-4xl md:text-6xl lg:text-7xl leading-tight">
+                  PROMPTED
+                </h1>
+                <p className="font-pixel text-xs md:text-sm text-gal-velvet tracking-wide">
+                  A PRESTIGIOUS GALLERY OF ABSOLUTE NONSENSE
+                </p>
+              </div>
+
+              <p className="font-retro text-2xl md:text-3xl text-muted-foreground max-w-2xl leading-snug">
+                You write the words. The machine paints its masterpiece.
+                Your friends pretend to be critics. The party game where
+                <span className="text-gal-velvet"> bad art wins big</span>.
               </p>
+
+              {/* The centerpiece: a gilded frame awaiting a masterpiece */}
+              <div className="gilded-frame animate-px-hop-in animation-delay-150 w-full max-w-md p-8 md:p-10">
+                <div className="dither-canvas flex aspect-[4/3] items-center justify-center border-[3px] border-ink">
+                  <p className="font-pixel bg-paper border-2 border-ink px-4 py-3 text-[10px] md:text-xs leading-relaxed">
+                    YOUR MASTERPIECE<br />HERE<span className="animate-px-blink">_</span>
+                  </p>
+                </div>
+                <div className="mt-4 flex justify-center">
+                  <p className="plaque px-3 py-2 text-[8px] md:text-[9px] leading-relaxed text-center">
+                    "UNTITLED No. 47" — THE MACHINE, 2026<br />MIXED PIXELS ON CANVAS
+                  </p>
+                </div>
+              </div>
+
               <div className="flex flex-col sm:flex-row gap-4">
-                <Button size="lg" onClick={() => user ? setMode('create') : navigate('/auth?next=host')} className="text-lg">
+                <Button size="lg" onClick={() => user ? setMode('create') : navigate('/auth?next=host')} className="h-14 px-8">
                   <Users className="mr-2 w-5 h-5" />
-                  Host a Game
+                  Host an exhibition
                 </Button>
-                <Button size="lg" variant="outline" onClick={() => setMode('join')} className="text-lg">
+                <Button size="lg" variant="outline" onClick={() => setMode('join')} className="h-14 px-8">
                   <QrCode className="mr-2 w-5 h-5" />
-                  Join a Game
+                  Enter as an artist
                 </Button>
               </div>
             </div>
           </section>
 
-          <Separator className="container" />
+          <div className="velvet-rule container" role="separator" />
 
           {/* What Is This Game Section */}
           <section className="container py-24">
             <div className="max-w-3xl mx-auto text-center space-y-6">
-              <h2 className="text-3xl md:text-4xl font-bold">What Is Prompted?</h2>
-              <p className="text-lg text-muted-foreground">
+              <h2 className="font-pixel text-xl md:text-2xl leading-relaxed">ABOUT THE GALLERY</h2>
+              <p className="font-retro text-2xl text-muted-foreground leading-snug">
                 Prompted is a social party game that combines the power of artificial intelligence with
                 your creativity. For the best experience, the host should use a laptop or connect to a TV screen
                 that everyone can see, while players join on their mobile phones.
               </p>
-              <p className="text-lg text-muted-foreground">
+              <p className="font-retro text-2xl text-muted-foreground leading-snug">
                 Players take turns being the judge each round—the judge picks or creates a prompt, and everyone
                 else competes to generate the best image to win the judge's approval. It's perfect for game nights,
                 team building, or just hanging out with friends!
@@ -839,56 +858,40 @@ const Landing = () => {
           </section>
 
           {/* How to Play Section */}
-          <section className="container py-24 bg-muted/30">
+          <section className="container py-24 bg-muted/40 border-y-[3px] border-ink/10">
         <div className="max-w-5xl mx-auto space-y-12">
           <div className="text-center space-y-4">
-            <h2 className="text-3xl md:text-4xl font-bold">How to Play</h2>
-            <p className="text-lg text-muted-foreground">Simple steps to start your creative competition</p>
+            <h2 className="font-pixel text-xl md:text-2xl leading-relaxed">THE CURATOR'S GUIDE</h2>
+            <p className="font-retro text-2xl text-muted-foreground">Simple steps to open your creative competition</p>
           </div>
 
           <div className="grid md:grid-cols-2 gap-8">
             {/* For Hosts */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="w-5 h-5 text-primary" />
-                  For Hosts
+                <CardTitle className="flex items-center gap-2 font-pixel text-sm leading-relaxed">
+                  <Users className="w-5 h-5 text-gal-velvet" />
+                  FOR CURATORS (HOSTS)
                 </CardTitle>
-                <CardDescription>Control the game and facilitate the fun</CardDescription>
+                <CardDescription className="font-retro text-lg">Control the game and facilitate the fun</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex gap-3">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
-                    1
+                {[
+                  'Create a game room on your laptop or computer (ideal for screen sharing to a TV)',
+                  'Share the code or QR code with players',
+                  'Start the game when everyone has joined',
+                  'Monitor all player submissions on the big screen for everyone to see',
+                  'Track scores across multiple rounds',
+                ].map((step, i) => (
+                  <div className="flex gap-3" key={i}>
+                    <div className="plaque flex-shrink-0 w-7 h-7 flex items-center justify-center text-[10px]">
+                      {i + 1}
+                    </div>
+                    <p className="font-retro text-xl leading-snug">{step}</p>
                   </div>
-                  <p className="text-sm">Create a game room on your laptop or computer (ideal for screen sharing to a TV)</p>
-                </div>
-                <div className="flex gap-3">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
-                    2
-                  </div>
-                  <p className="text-sm">Share the code or QR code with players</p>
-                </div>
-                <div className="flex gap-3">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
-                    3
-                  </div>
-                  <p className="text-sm">Start the game when everyone has joined</p>
-                </div>
-                <div className="flex gap-3">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
-                    4
-                  </div>
-                  <p className="text-sm">Monitor all player submissions on the big screen for everyone to see</p>
-                </div>
-                <div className="flex gap-3">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
-                    5
-                  </div>
-                  <p className="text-sm">Track scores across multiple rounds</p>
-                </div>
-                <div className="mt-4 p-3 bg-primary/10 rounded-lg">
-                  <p className="text-sm">💡 Best played with your screen shared to a TV while players use their phones</p>
+                ))}
+                <div className="mt-4 p-3 border-2 border-ink bg-primary/15">
+                  <p className="font-retro text-xl">★ Best played with your screen shared to a TV while players use their phones</p>
                 </div>
               </CardContent>
             </Card>
@@ -896,49 +899,28 @@ const Landing = () => {
             {/* For Players */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <GamepadIcon className="w-5 h-5 text-primary" />
-                  For Players
+                <CardTitle className="flex items-center gap-2 font-pixel text-sm leading-relaxed">
+                  <GamepadIcon className="w-5 h-5 text-gal-velvet" />
+                  FOR ARTISTS (PLAYERS)
                 </CardTitle>
-                <CardDescription>Join on your phone for the best mobile experience</CardDescription>
+                <CardDescription className="font-retro text-lg">Join on your phone for the best mobile experience</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex gap-3">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
-                    1
+                {[
+                  'Join with your name and room code on your mobile device',
+                  'Wait for the host to start the game',
+                  'One player is selected as the judge—they choose a prompt from the library or create their own',
+                  "Generate your best image to impress the judge (if you're not the judge this round)",
+                  "If you're the judge, review all submissions and pick your favorite. Otherwise, wait for the judge's decision!",
+                  'Compete for points as the judge role rotates each round!',
+                ].map((step, i) => (
+                  <div className="flex gap-3" key={i}>
+                    <div className="plaque flex-shrink-0 w-7 h-7 flex items-center justify-center text-[10px]">
+                      {i + 1}
+                    </div>
+                    <p className="font-retro text-xl leading-snug">{step}</p>
                   </div>
-                  <p className="text-sm">Join with your name and room code on your mobile device</p>
-                </div>
-                <div className="flex gap-3">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
-                    2
-                  </div>
-                  <p className="text-sm">Wait for the host to start the game</p>
-                </div>
-                <div className="flex gap-3">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
-                    3
-                  </div>
-                  <p className="text-sm">One player is selected as the judge—they choose a prompt from the library or create their own</p>
-                </div>
-                <div className="flex gap-3">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
-                    4
-                  </div>
-                  <p className="text-sm">Generate your best image to impress the judge (if you're not the judge this round)</p>
-                </div>
-                <div className="flex gap-3">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
-                    5
-                  </div>
-                  <p className="text-sm">If you're the judge, review all submissions and pick your favorite. Otherwise, wait for the judge's decision!</p>
-                </div>
-                <div className="flex gap-3">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
-                    6
-                  </div>
-                  <p className="text-sm">Compete for points as the judge role rotates each round!</p>
-                </div>
+                ))}
               </CardContent>
             </Card>
           </div>
@@ -949,19 +931,21 @@ const Landing = () => {
           <section className="container py-24">
             <div className="max-w-5xl mx-auto space-y-12">
               <div className="text-center space-y-4">
-                <h2 className="text-3xl md:text-4xl font-bold">Key Features</h2>
-                <p className="text-lg text-muted-foreground">Everything you need for an amazing game experience</p>
+                <h2 className="font-pixel text-xl md:text-2xl leading-relaxed">GALLERY AMENITIES</h2>
+                <p className="font-retro text-2xl text-muted-foreground">Everything you need for an amazing game experience</p>
               </div>
 
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {features.map((feature, index) => (
-                  <Card key={index}>
+                  <Card key={index} className="animate-px-hop-in" style={{ animationDelay: `${index * 60}ms` }}>
                     <CardHeader>
-                      <feature.icon className="w-10 h-10 text-primary mb-2" />
-                      <CardTitle className="text-xl">{feature.title}</CardTitle>
+                      <div className="plaque mb-3 inline-flex h-12 w-12 items-center justify-center self-start">
+                        <feature.icon className="w-6 h-6" />
+                      </div>
+                      <CardTitle className="font-pixel text-xs leading-relaxed">{feature.title.toUpperCase()}</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <p className="text-muted-foreground">{feature.description}</p>
+                      <p className="font-retro text-xl text-muted-foreground leading-snug">{feature.description}</p>
                     </CardContent>
                   </Card>
                 ))}
@@ -970,21 +954,23 @@ const Landing = () => {
           </section>
 
           {/* Game Roles Section */}
-          <section className="container py-24 bg-muted/30">
+          <section className="container py-24 bg-muted/40 border-y-[3px] border-ink/10">
             <div className="max-w-4xl mx-auto space-y-12">
               <div className="text-center space-y-4">
-                <h2 className="text-3xl md:text-4xl font-bold">Game Roles Explained</h2>
-                <p className="text-lg text-muted-foreground">Understanding your role in the game</p>
+                <h2 className="font-pixel text-xl md:text-2xl leading-relaxed">THE HOUSE ROLES</h2>
+                <p className="font-retro text-2xl text-muted-foreground">Understanding your role in the game</p>
               </div>
 
               <div className="grid md:grid-cols-3 gap-6">
                 <Card>
                   <CardHeader>
-                    <Users className="w-10 h-10 text-primary mb-2" />
-                    <CardTitle>Host</CardTitle>
+                    <div className="plaque mb-3 inline-flex h-12 w-12 items-center justify-center self-start">
+                      <Users className="w-6 h-6" />
+                    </div>
+                    <CardTitle className="font-pixel text-xs leading-relaxed">THE CURATOR (HOST)</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-muted-foreground">
+                    <p className="font-retro text-xl text-muted-foreground leading-snug">
                       Controls the game flow, can see all players and submissions, and starts each round
                     </p>
                   </CardContent>
@@ -992,11 +978,13 @@ const Landing = () => {
 
                 <Card>
                   <CardHeader>
-                    <Trophy className="w-10 h-10 text-primary mb-2" />
-                    <CardTitle>Judge</CardTitle>
+                    <div className="plaque mb-3 inline-flex h-12 w-12 items-center justify-center self-start">
+                      <Trophy className="w-6 h-6" />
+                    </div>
+                    <CardTitle className="font-pixel text-xs leading-relaxed">THE CRITIC (JUDGE)</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-muted-foreground">
+                    <p className="font-retro text-xl text-muted-foreground leading-snug">
                       Rotates each round among all players. The judge selects or creates the creative prompt,
                       then reviews all submissions and picks their favorite winning image. You can't be the
                       judge and compete in the same round.
@@ -1006,11 +994,13 @@ const Landing = () => {
 
                 <Card>
                   <CardHeader>
-                    <GamepadIcon className="w-10 h-10 text-primary mb-2" />
-                    <CardTitle>Players</CardTitle>
+                    <div className="plaque mb-3 inline-flex h-12 w-12 items-center justify-center self-start">
+                      <GamepadIcon className="w-6 h-6" />
+                    </div>
+                    <CardTitle className="font-pixel text-xs leading-relaxed">THE ARTISTS (PLAYERS)</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-muted-foreground">
+                    <p className="font-retro text-xl text-muted-foreground leading-snug">
                       Create images based on prompts and vote on submissions to earn points
                     </p>
                   </CardContent>
@@ -1023,16 +1013,18 @@ const Landing = () => {
           <section className="container py-24">
             <div className="max-w-4xl mx-auto space-y-12">
               <div className="text-center space-y-4">
-                <h2 className="text-3xl md:text-4xl font-bold">Perfect For</h2>
-                <p className="text-lg text-muted-foreground">Great occasions to play Prompted</p>
+                <h2 className="font-pixel text-xl md:text-2xl leading-relaxed">SUITABLE OCCASIONS</h2>
+                <p className="font-retro text-2xl text-muted-foreground">Great occasions to visit the gallery</p>
               </div>
 
-              <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+              <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-4">
                 {useCases.map((useCase, index) => (
                   <Card key={index} className="text-center">
-                    <CardContent className="pt-6 space-y-2">
-                      <useCase.icon className="w-8 h-8 text-primary mx-auto" />
-                      <p className="text-sm font-medium">{useCase.text}</p>
+                    <CardContent className="pt-6 space-y-3">
+                      <div className="plaque mx-auto inline-flex h-11 w-11 items-center justify-center">
+                        <useCase.icon className="w-5 h-5" />
+                      </div>
+                      <p className="font-retro text-xl">{useCase.text}</p>
                     </CardContent>
                   </Card>
                 ))}
@@ -1041,75 +1033,73 @@ const Landing = () => {
           </section>
 
           {/* FAQ Section */}
-          <section className="container py-24 bg-muted/30">
+          <section className="container py-24 bg-muted/40 border-y-[3px] border-ink/10">
             <div className="max-w-3xl mx-auto space-y-12">
               <div className="text-center space-y-4">
-                <h2 className="text-3xl md:text-4xl font-bold">Frequently Asked Questions</h2>
-                <p className="text-lg text-muted-foreground">Everything you need to know</p>
+                <h2 className="font-pixel text-xl md:text-2xl leading-relaxed">VISITOR INFORMATION</h2>
+                <p className="font-retro text-2xl text-muted-foreground">Everything you need to know</p>
               </div>
 
               <Accordion type="single" collapsible className="w-full">
                 {faqs.map((faq, index) => (
-                  <AccordionItem key={index} value={`item-${index}`}>
-                    <AccordionTrigger className="text-left">{faq.question}</AccordionTrigger>
-                    <AccordionContent className="text-muted-foreground">{faq.answer}</AccordionContent>
+                  <AccordionItem key={index} value={`item-${index}`} className="border-b-2 border-ink/20">
+                    <AccordionTrigger className="text-left font-retro text-2xl hover:no-underline">{faq.question}</AccordionTrigger>
+                    <AccordionContent className="font-retro text-xl text-muted-foreground leading-snug">{faq.answer}</AccordionContent>
                   </AccordionItem>
                 ))}
               </Accordion>
             </div>
           </section>
 
-          {/* Footer CTA */}
+          {/* Footer CTA — the velvet room */}
           <section className="container py-24">
-            <Card className="bg-primary text-primary-foreground">
-              <CardContent className="py-12">
+            <div className="border-[3px] border-ink bg-gal-velvet text-secondary-foreground shadow-[8px_8px_0_0_hsl(var(--gal-gold))]">
+              <div className="py-14 px-6">
                 <div className="max-w-3xl mx-auto text-center space-y-8">
-                  <h2 className="text-3xl md:text-4xl font-bold">Ready to Start Playing?</h2>
-                  <p className="text-lg opacity-90">
+                  <h2 className="font-pixel text-lg md:text-2xl leading-relaxed">THE DOORS ARE OPEN</h2>
+                  <p className="font-retro text-2xl opacity-90 leading-snug">
                     Join thousands of players creating amazing AI-generated images and competing with friends
                   </p>
                   <div className="flex flex-col sm:flex-row gap-4 justify-center">
                     <Button
                       size="lg"
-                      variant="secondary"
                       onClick={() => user ? setMode('create') : navigate('/auth?next=host')}
-                      className="text-lg"
+                      className="h-14 px-8"
                     >
                       <Users className="mr-2 w-5 h-5" />
-                      Host a Game
+                      Host an exhibition
                     </Button>
                     <Button
                       size="lg"
-                      variant="outline"
                       onClick={() => setMode('join')}
-                      className="text-lg bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                      className="h-14 px-8 px-btn bg-paper text-ink hover:bg-paper"
                     >
                       <QrCode className="mr-2 w-5 h-5" />
-                      Join a Game
+                      Enter as an artist
                     </Button>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </section>
 
           {/* Footer */}
-          <footer className="border-t">
+          <footer className="border-t-[3px] border-ink">
             <div className="container py-8">
               <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-primary" />
-                  <span className="font-semibold">Prompted</span>
+                <div className="flex items-center gap-3">
+                  <span className="plaque px-2 py-1.5 text-[9px]">▦</span>
+                  <span className="font-pixel text-xs">PROMPTED — FINE ART, POORLY UNDERSTOOD</span>
                 </div>
       <div className="flex items-center gap-4">
-        <Button 
-          variant="ghost" 
-          size="sm" 
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => setSuggestionDialogOpen(true)}
           className="text-muted-foreground hover:text-foreground"
         >
           <Mail className="w-4 h-4 md:mr-1" />
-          <span className="hidden md:inline">Suggestions or Prompt Ideas?</span>
+          <span className="hidden md:inline">Suggestion box</span>
         </Button>
         <Button variant="ghost" size="sm" onClick={() => navigate("/auth")}>
           Login
