@@ -9,10 +9,10 @@ interface UsePurchasedGameModesResult {
 }
 
 /**
- * Reads which game modes the given host has unlocked (purchased_game_modes
- * table, populated only by the stripe-webhook edge function after a real
- * payment). Table isn't in the generated Supabase types yet, hence the `any`
- * cast on the query builder.
+ * Reads which game modes the given host has unlocked. Backed by the
+ * get_unlocked_game_modes RPC, which returns purchased_game_modes rows
+ * (populated only by the stripe-webhook edge function after a real payment)
+ * for regular hosts, or every mode for hosts with the admin role.
  */
 export function usePurchasedGameModes(hostId: string | null | undefined): UsePurchasedGameModesResult {
   const [owned, setOwned] = useState<Set<GameMode>>(new Set());
@@ -25,13 +25,12 @@ export function usePurchasedGameModes(hostId: string | null | undefined): UsePur
     }
     setLoading(true);
     try {
-      const { data, error } = await (supabase as any)
-        .from("purchased_game_modes")
-        .select("game_mode")
-        .eq("host_id", hostId);
+      const { data, error } = await (supabase as any).rpc("get_unlocked_game_modes", {
+        p_host_id: hostId,
+      });
 
       if (error) throw error;
-      setOwned(new Set((data ?? []).map((row: { game_mode: GameMode }) => row.game_mode)));
+      setOwned(new Set((data ?? []) as GameMode[]));
     } catch (err) {
       console.error("usePurchasedGameModes fetch error:", err);
     } finally {
