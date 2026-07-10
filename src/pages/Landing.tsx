@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
 import { Input } from "@/components/ui/input";
@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import { validateSuggestionForm } from "@/lib/validation";
 import { usePurchasedGameModes } from "@/hooks/usePurchasedGameModes";
+import { useGenerationLimit } from "@/hooks/useGenerationLimit";
 import { startCheckout, type GameMode } from "@/lib/checkout";
 
 interface Room {
@@ -203,6 +204,7 @@ const Landing = () => {
   const [gameMode, setGameMode] = useState<'judge' | 'voting' | 'forgery' | 'duel'>('judge');
   const [hostRooms, setHostRooms] = useState<Room[]>([]);
   const { owned: ownedModes, loading: ownedModesLoading, refetch: refetchOwnedModes } = usePurchasedGameModes(user?.id);
+  const { currentCount, maxLimit, remaining } = useGenerationLimit(user?.id);
   const [purchasing, setPurchasing] = useState(false);
 
   const ALL_MODES: GameMode[] = ['judge', 'voting', 'forgery', 'duel'];
@@ -267,21 +269,40 @@ const Landing = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Determine initial mode based on URL params and login status
+  // Determine initial mode based on URL params and login status.
+  // These refs snapshot the *initial* deep-link intent once on mount so that
+  // clearing the URL param below (or hostRooms loading in afterward) can't
+  // re-trigger this logic and fight its own decision -- previously, after
+  // setMode('create') + navigate('/', {replace:true}) ran, the resulting
+  // searchParams/user change re-ran this effect, saw no more '?mode=host'
+  // and an empty hostRooms list, and snapped straight back to 'marketing'.
+  const deepLinkHandled = useRef(false);
+  const pendingHostRedirect = useRef(searchParams.get('mode') === 'host');
+  const isJoinDeepLink = useRef(searchParams.get('mode') === 'join' || !!searchParams.get('code'));
+
   useEffect(() => {
-    const urlMode = searchParams.get('mode');
-    if (urlMode === 'host' && user) {
+    if (deepLinkHandled.current) return;
+
+    if (pendingHostRedirect.current) {
+      if (!user) return; // wait for the auth session to resolve
       setMode('create');
-      // Clean up the URL param so refresh doesn't force create mode
+      deepLinkHandled.current = true;
       navigate('/', { replace: true });
-    } else if (urlMode === 'join') {
+      return;
+    }
+
+    if (isJoinDeepLink.current) {
       setMode('join');
-    } else if (user && hostRooms.length > 0) {
+      deepLinkHandled.current = true;
+      return;
+    }
+
+    if (user && hostRooms.length > 0) {
       setMode('active-games');
     } else {
       setMode('marketing');
     }
-  }, [searchParams, user, hostRooms.length]);
+  }, [user, hostRooms.length, navigate]);
 
   // Fetch active host rooms
   const fetchHostRooms = async (userId: string) => {
@@ -765,16 +786,39 @@ const Landing = () => {
 
       {/* Create Game Mode Selection */}
       {mode === 'create' && (
-        <section className="container py-24">
-          <div className="max-w-2xl mx-auto space-y-6">
-            <h1 className="font-pixel text-2xl text-center mb-2 leading-relaxed">SELECT GAME MODE</h1>
-            <p className="font-retro text-center text-xl text-muted-foreground mb-6">
+        <section className="container py-4 md:h-[calc(100vh-4rem)]">
+          <div className="max-w-2xl mx-auto flex flex-col gap-3 md:h-full">
+            <h1 className="font-pixel text-xl text-center leading-relaxed">SELECT GAME MODE</h1>
+            <p className="font-retro text-center text-lg text-muted-foreground">
               {allModesOwned
                 ? 'All game modes unlocked'
                 : 'One-time $19.99 unlock gets all 4 game modes + 1000 image generations'}
             </p>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {user && (
+              <div className="flex flex-wrap items-center justify-between gap-2 border-2 border-ink bg-paper/60 px-3 py-1.5 font-retro text-base shrink-0">
+                {remaining <= 10 ? (
+                  <span className="text-gal-seal">⚠ Only {remaining} image credit{remaining === 1 ? '' : 's'} left</span>
+                ) : (
+                  <span className="text-muted-foreground">
+                    {currentCount} / {maxLimit} image generations used ({remaining} left)
+                  </span>
+                )}
+                {remaining <= 10 && (
+                  <Button
+                    size="sm"
+                    variant={remaining === 0 ? 'default' : 'outline'}
+                    disabled={purchasing}
+                    onClick={() => buyModes({ type: 'credits', creditPacks: 1 })}
+                  >
+                    {purchasing && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
+                    Buy 1,000 more – $5
+                  </Button>
+                )}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 md:grid-rows-2 gap-3 md:flex-1 md:min-h-0">
               {([
                 {
                   id: 'judge' as GameMode,
@@ -810,11 +854,11 @@ const Landing = () => {
                   <Card
                     key={m.id}
                     onClick={() => setGameMode(m.id)}
-                    className={`p-8 cursor-pointer relative ${
+                    className={`p-4 cursor-pointer relative overflow-hidden md:h-full ${
                       isSelected ? 'ring-4 ring-primary bg-primary/10' : ''
                     }`}
                   >
-                    <CardContent className="p-0 space-y-4">
+                    <CardContent className="p-0 h-full flex flex-col justify-center space-y-2">
                       <div className="flex items-center gap-2">
                         <h3 className="font-pixel text-sm leading-relaxed">{m.title}</h3>
                         {m.badge && (
@@ -828,8 +872,8 @@ const Landing = () => {
                           </Badge>
                         )}
                       </div>
-                      <p className="font-retro text-xl text-muted-foreground">{m.desc}</p>
-                      <ul className="font-retro text-lg text-muted-foreground space-y-1">
+                      <p className="font-retro text-xl leading-snug text-muted-foreground">{m.desc}</p>
+                      <ul className="font-retro text-lg leading-snug text-muted-foreground space-y-1">
                         {m.bullets.map((b) => <li key={b}>▸ {b}</li>)}
                       </ul>
                     </CardContent>
@@ -838,7 +882,7 @@ const Landing = () => {
               })}
             </div>
 
-            <div className="flex gap-4">
+            <div className="flex gap-4 shrink-0">
               <Button
                 onClick={() => setMode(user && hostRooms.length > 0 ? 'active-games' : 'marketing')}
                 variant="outline"
