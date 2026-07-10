@@ -1045,19 +1045,18 @@ const Index = () => {
     }
 
     // Defense-in-depth: the "Create Game" button in Landing.tsx already only appears
-    // for modes the host has purchased, but re-check here in case this is reached any
-    // other way (e.g. handleCreateNewRoom re-launching a mode from an old room).
+    // for modes the host has purchased (or if the host is an admin), but re-check
+    // here in case this is reached any other way (e.g. handleCreateNewRoom
+    // re-launching a mode from an old room).
     try {
-      const { data: unlock, error: unlockError } = await (supabase as any)
-        .from('purchased_game_modes')
-        .select('game_mode')
-        .eq('host_id', user.id)
-        .eq('game_mode', gameMode)
-        .maybeSingle();
+      const { data: unlockedModes, error: unlockError } = await (supabase as any).rpc(
+        'get_unlocked_game_modes',
+        { p_host_id: user.id }
+      );
 
       if (unlockError) {
         console.error('Error checking game mode purchase:', unlockError);
-      } else if (!unlock) {
+      } else if (!(unlockedModes ?? []).includes(gameMode)) {
         toast({
           title: 'Mode not unlocked',
           description: `You haven't purchased ${gameMode} mode yet. Head back to game mode selection to unlock it.`,
