@@ -33,6 +33,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { validatePlayerName } from '@/lib/validation';
 import { getUserFriendlyErrorMessage, logErrorInDev } from '@/lib/errorUtils';
+import { generateRoomCode } from '@/lib/roomCode';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -1035,10 +1036,6 @@ const Index = () => {
       }
     }
     return scoreChanges;
-  };
-
-  const generateRoomCode = () => {
-    return Math.random().toString(36).substring(2, 8).toUpperCase();
   };
 
   const handleCreateRoom = async (gameMode: GameMode = 'judge') => {

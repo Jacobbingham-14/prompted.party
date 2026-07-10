@@ -38,6 +38,7 @@ import {
 import { validateSuggestionForm } from "@/lib/validation";
 import { usePurchasedGameModes } from "@/hooks/usePurchasedGameModes";
 import { useGenerationLimit } from "@/hooks/useGenerationLimit";
+import { generateRoomCode } from "@/lib/roomCode";
 import { startCheckout, type GameMode } from "@/lib/checkout";
 
 interface Room {
@@ -333,7 +334,7 @@ const Landing = () => {
     }
 
     try {
-      const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const code = generateRoomCode();
       const { data, error } = await supabase
         .from('rooms')
         .insert({
