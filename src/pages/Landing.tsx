@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import { validateSuggestionForm } from "@/lib/validation";
 import { usePurchasedGameModes } from "@/hooks/usePurchasedGameModes";
+import { useGenerationLimit } from "@/hooks/useGenerationLimit";
 import { startCheckout, type GameMode } from "@/lib/checkout";
 
 interface Room {
@@ -203,6 +204,7 @@ const Landing = () => {
   const [gameMode, setGameMode] = useState<'judge' | 'voting' | 'forgery' | 'duel'>('judge');
   const [hostRooms, setHostRooms] = useState<Room[]>([]);
   const { owned: ownedModes, loading: ownedModesLoading, refetch: refetchOwnedModes } = usePurchasedGameModes(user?.id);
+  const { currentCount, maxLimit, remaining } = useGenerationLimit(user?.id);
   const [purchasing, setPurchasing] = useState(false);
 
   const ALL_MODES: GameMode[] = ['judge', 'voting', 'forgery', 'duel'];
@@ -792,6 +794,29 @@ const Landing = () => {
                 ? 'All game modes unlocked'
                 : 'One-time $19.99 unlock gets all 4 game modes + 1000 image generations'}
             </p>
+
+            {user && (
+              <div className="flex flex-wrap items-center justify-between gap-2 border-2 border-ink bg-paper/60 px-3 py-1.5 font-retro text-base shrink-0">
+                {remaining <= 10 ? (
+                  <span className="text-gal-seal">⚠ Only {remaining} image credit{remaining === 1 ? '' : 's'} left</span>
+                ) : (
+                  <span className="text-muted-foreground">
+                    {currentCount} / {maxLimit} image generations used ({remaining} left)
+                  </span>
+                )}
+                {remaining <= 10 && (
+                  <Button
+                    size="sm"
+                    variant={remaining === 0 ? 'default' : 'outline'}
+                    disabled={purchasing}
+                    onClick={() => buyModes({ type: 'credits', creditPacks: 1 })}
+                  >
+                    {purchasing && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
+                    Buy 1,000 more – $5
+                  </Button>
+                )}
+              </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 md:grid-rows-2 gap-3 md:flex-1 md:min-h-0">
               {([

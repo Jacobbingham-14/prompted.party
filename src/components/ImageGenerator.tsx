@@ -16,10 +16,8 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { useGenerationLimit } from "@/hooks/useGenerationLimit";
-import { startCheckout } from "@/lib/checkout";
 
 interface GeneratedImage {
   url: string;
@@ -51,36 +49,12 @@ export const ImageGenerator = ({ onImageReady, onClose, prompt: initialPrompt, r
   const [isPreparingImage, setIsPreparingImage] = useState(false);
   const [conversation, setConversation] = useState<ConversationMessage[]>([]);
   const [currentSeed, setCurrentSeed] = useState<number | undefined>(undefined);
-  const [fullPromptChain, setFullPromptChain] = useState<string>("");
-  const [pendingPrompt, setPendingPrompt] = useState<string>("");
-  const [showGenerateButton, setShowGenerateButton] = useState(false);
   const [imageHistory, setImageHistory] = useState<GeneratedImage[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const { allowed, currentCount, maxLimit, remaining, decrementLocally } = useGenerationLimit(hostId);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [buyingCredits, setBuyingCredits] = useState(false);
-  const isHostViewer = !!hostId && currentUserId === hostId;
-
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id ?? null));
-  }, []);
-
-  const handleBuyCredits = async (packs: number) => {
-    setBuyingCredits(true);
-    try {
-      await startCheckout({ type: "credits", creditPacks: packs });
-    } catch (err) {
-      toast({
-        title: "Couldn't start checkout",
-        description: err instanceof Error ? err.message : "Unknown error",
-        variant: "destructive",
-      });
-      setBuyingCredits(false);
-    }
-  };
+  const { allowed, decrementLocally } = useGenerationLimit(hostId);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -100,18 +74,17 @@ export const ImageGenerator = ({ onImageReady, onClose, prompt: initialPrompt, r
   }, [prompt]);
 
 
-  const generateImage = async (finalPrompt: string, useRemix: boolean = false) => {
+  const generateImage = async (finalPrompt: string) => {
     if (!allowed && hostId) {
       toast({
         title: "Generation limit reached",
-        description: `You've used all ${maxLimit} generations for this account.`,
+        description: "Ask your host to top up image credits to keep generating.",
         variant: "destructive",
       });
       return;
     }
 
     setIsGenerating(true);
-    setShowGenerateButton(false);
 
     try {
       // Always use a fresh random seed. There's no image-to-image conditioning
@@ -136,7 +109,7 @@ export const ImageGenerator = ({ onImageReady, onClose, prompt: initialPrompt, r
         if (error.message?.includes('429') || (data as any)?.remaining === 0) {
           toast({
             title: "Generation limit reached",
-            description: `You've used all ${maxLimit} generations for this account.`,
+            description: "Ask your host to top up image credits to keep generating.",
             variant: "destructive",
           });
           return;
@@ -150,7 +123,6 @@ export const ImageGenerator = ({ onImageReady, onClose, prompt: initialPrompt, r
 
       const newSeed = seedToUse ?? Math.floor(Math.random() * 1000000);
       setCurrentSeed(newSeed);
-      setFullPromptChain(finalPrompt);
 
       setConversation((prev) => [
         ...prev,
@@ -188,7 +160,6 @@ export const ImageGenerator = ({ onImageReady, onClose, prompt: initialPrompt, r
       ]);
     } finally {
       setIsGenerating(false);
-      setPendingPrompt("");
     }
   };
 
@@ -228,89 +199,19 @@ export const ImageGenerator = ({ onImageReady, onClose, prompt: initialPrompt, r
     if (!prompt.trim() || isGenerating) return;
 
     const userMessage = prompt.trim();
-
-    const generateKeywords = [
-      "no",
-      "nope",
-      "no thanks",
-      "yes",
-      "yeah",
-      "yep",
-      "sure",
-      "generate",
-      "create",
-      "make it",
-      "go",
-      "proceed",
-      "do it",
-      "that's good",
-      "looks good",
-      "perfect",
-    ];
-
-    const wantsToGenerate = generateKeywords.some(
-      (keyword) => userMessage.toLowerCase() === keyword || userMessage.toLowerCase().includes(keyword),
-    );
-
     setConversation((prev) => [...prev, { role: "user", content: userMessage }]);
-
-    if (wantsToGenerate && pendingPrompt) {
-      setPrompt("");
-      if (textareaRef.current) {
-        textareaRef.current.style.height = "auto";
-      }
-      const isRemix = fullPromptChain && pendingPrompt.includes(fullPromptChain);
-      generateImage(pendingPrompt, isRemix);
-      return;
-    }
-
-    if (fullPromptChain) {
-      const remixKeywords = [
-        "different angle",
-        "another angle",
-        "change composition",
-        "different view",
-        "zoom",
-        "closer",
-        "further",
-        "from above",
-        "from below",
-        "rotate",
-        "flip",
-      ];
-
-      const isRemixRequest = remixKeywords.some((keyword) => userMessage.toLowerCase().includes(keyword));
-
-      setPrompt("");
-
-      const finalPrompt = `${fullPromptChain}. ${userMessage}`;
-      generateImage(finalPrompt, isRemixRequest);
-    } else {
-      setPrompt("");
-      generateImage(userMessage, false);
-      return;
-    }
-
+    setPrompt("");
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
+
+    generateImage(userMessage);
   };
-
-  const handleGenerate = () => {
-    if (!pendingPrompt) return;
-
-    const isRemix = fullPromptChain && pendingPrompt.includes(fullPromptChain);
-    generateImage(pendingPrompt, isRemix);
-  };
-
 
   const handleStartOver = () => {
     setConversation([]);
     setCurrentSeed(undefined);
-    setFullPromptChain("");
     setPrompt("");
-    setPendingPrompt("");
-    setShowGenerateButton(false);
   };
 
   const handleDownloadImage = async (url: string, index: number) => {
@@ -351,16 +252,8 @@ export const ImageGenerator = ({ onImageReady, onClose, prompt: initialPrompt, r
     e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
   };
 
-  const handleQuickAction = async (action: string) => {
-    setConversation((prev) => [...prev, { role: "user", content: action }]);
-
-    const finalPrompt = fullPromptChain ? `${fullPromptChain}. ${action}` : action;
-    generateImage(finalPrompt, false);
-  };
-
   const handleEditPrompt = (promptText: string) => {
     setPrompt(promptText);
-    setPendingPrompt("");
     textareaRef.current?.focus();
   };
 
@@ -479,16 +372,16 @@ export const ImageGenerator = ({ onImageReady, onClose, prompt: initialPrompt, r
               <h3 className="text-xl font-semibold mb-2">Start Creating</h3>
               {initialPrompt ? (
                 <div className="max-w-xl mx-auto">
-                  <p className="text-sm text-muted-foreground mb-3">Your assigned prompt:</p>
+                  <p className="text-lg text-muted-foreground mb-3">Your assigned prompt:</p>
             <div className="border-2 border-primary/50 rounded-lg p-6 bg-primary/5">
               <p className="text-xl text-foreground font-semibold">{initialPrompt}</p>
                   </div>
-                  <p className="text-sm text-muted-foreground mt-3">
+                  <p className="text-lg text-muted-foreground mt-3">
                     Type in the box below to start generating your image based on this prompt.
                   </p>
                 </div>
               ) : (
-                <p className="text-muted-foreground max-w-md">
+                <p className="text-lg text-muted-foreground max-w-md">
                   Describe the scene you imagine — The more specific the prompt, the better the result.
                 </p>
               )}
@@ -503,36 +396,34 @@ export const ImageGenerator = ({ onImageReady, onClose, prompt: initialPrompt, r
                     msg.role === "user"
                       ? "bg-primary text-primary-foreground rounded-[20px] rounded-br-sm"
                       : "bg-secondary text-secondary-foreground rounded-[20px] rounded-bl-sm"
-                  } px-4 py-2.5 shadow-sm`}
+                  } px-4 py-3 shadow-sm`}
                 >
                   {msg.content && (
-                    <p className="text-[15px] leading-relaxed whitespace-pre-wrap break-words">{msg.content}</p>
+                    <p className="text-xl leading-relaxed whitespace-pre-wrap break-words">{msg.content}</p>
                   )}
                   {msg.imageUrl && (
                     <div className={msg.content ? "mt-2" : ""}>
                       <img src={msg.imageUrl} alt="Generated" className="rounded-lg w-full max-w-md shadow-md" />
-                      {idx === conversation.length - 1 && !isGenerating && (
+                      {idx === conversation.length - 1 && !isGenerating && msg.fullPrompt && (
                         <div className="mt-3 flex flex-wrap gap-2">
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => generateImage(fullPromptChain, true)}
+                            onClick={() => generateImage(msg.fullPrompt!)}
                             className="rounded-full text-xs"
                           >
                             <Zap className="w-3 h-3 mr-1" />
                             Remix Style
                           </Button>
-                          {msg.fullPrompt && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleEditPrompt(msg.fullPrompt!)}
-                              className="rounded-full text-xs"
-                            >
-                              <Pencil className="w-3 h-3 mr-1" />
-                              Edit Prompt
-                            </Button>
-                          )}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleEditPrompt(msg.fullPrompt!)}
+                            className="rounded-full text-xs"
+                          >
+                            <Pencil className="w-3 h-3 mr-1" />
+                            Edit Prompt
+                          </Button>
                           {renderUseImageButton(msg)}
                         </div>
                       )}
@@ -561,63 +452,14 @@ export const ImageGenerator = ({ onImageReady, onClose, prompt: initialPrompt, r
 
       <div className="border-t bg-card p-4 shrink-0 sticky bottom-0 z-10">
         <div className="max-w-4xl mx-auto">
-          {hostId && (
-            <div className="mb-3 space-y-2">
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>
-                  {remaining <= 10 && remaining > 0 && (
-                    <span className="text-yellow-600 font-medium">⚠ {remaining} generations remaining</span>
-                  )}
-                  {remaining === 0 && (
-                    <span className="text-destructive font-medium">Generation limit reached</span>
-                  )}
-                  {remaining > 10 && <span>{currentCount} / {maxLimit} generations used</span>}
-                </span>
-                <span>{remaining} left</span>
-              </div>
-              <Progress value={(currentCount / maxLimit) * 100} className="h-1" />
-              {remaining <= 10 && isHostViewer && (
-                <div className="flex justify-end gap-2">
-                  <Button
-                    size="sm"
-                    variant={remaining === 0 ? "default" : "outline"}
-                    disabled={buyingCredits}
-                    onClick={() => handleBuyCredits(1)}
-                  >
-                    {buyingCredits ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : null}
-                    Buy 1,000 more credits – $5
-                  </Button>
-                </div>
-              )}
-              {remaining <= 10 && !isHostViewer && (
-                <p className="text-xs text-muted-foreground text-right">
-                  Running low on image credits — ask the host to top up.
-                </p>
-              )}
-            </div>
-          )}
-          {showGenerateButton && !isGenerating && (
-            <div className="mb-3 flex justify-center">
-              <Button onClick={handleGenerate} size="lg" className="rounded-full px-8">
-                <Send className="w-4 h-4 mr-2" />
-                Generate Image
-              </Button>
-            </div>
-          )}
           <div className="flex items-end gap-2">
             <Textarea
               ref={textareaRef}
-              placeholder={
-                fullPromptChain
-                  ? "Describe changes..."
-                  : showGenerateButton
-                    ? "Add more details or generate..."
-                    : "Describe what you want to create..."
-              }
+              placeholder="Describe what you want to create..."
               value={prompt}
               onChange={handleTextareaChange}
               onKeyDown={handleKeyPress}
-              className="min-h-[60px] max-h-[240px] resize-none rounded-[22px] border-border bg-background px-4 py-3 text-[15px] leading-relaxed overflow-y-auto"
+              className="min-h-[60px] max-h-[240px] resize-none rounded-[22px] border-border bg-background px-4 py-3 text-lg leading-relaxed overflow-y-auto"
               disabled={isGenerating}
               rows={2}
             />
