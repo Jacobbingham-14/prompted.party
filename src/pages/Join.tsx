@@ -6,6 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { validatePlayerName } from '@/lib/validation';
+import { normalizeRoomCode } from '@/lib/roomCode';
+import { findRoomByCode } from '@/lib/roomLookup';
 import { getUserFriendlyErrorMessage, logErrorInDev } from '@/lib/errorUtils';
 
 export default function Join() {
@@ -20,7 +22,7 @@ export default function Join() {
   useEffect(() => {
     const codeFromUrl = searchParams.get('code');
     if (codeFromUrl) {
-      setRoomCode(codeFromUrl.toUpperCase());
+      setRoomCode(normalizeRoomCode(codeFromUrl));
     }
   }, [searchParams]);
 
@@ -52,10 +54,7 @@ export default function Join() {
       const validatedName = validatePlayerName(playerName);
 
       // Find room
-      const { data: roomRows } = await supabase.rpc('find_room_by_code', {
-        room_code: roomCode.toUpperCase()
-      });
-      const room = Array.isArray(roomRows) ? roomRows[0] : roomRows;
+      const { room, code: normalizedCode } = await findRoomByCode(roomCode);
 
       if (!room) {
         toast({
@@ -117,14 +116,14 @@ export default function Join() {
       // Store game session (matching Index.tsx format)
       localStorage.setItem('playerId', player.id);
       localStorage.setItem('roomId', room.id);
-      localStorage.setItem('roomCode', roomCode.toUpperCase());
+      localStorage.setItem('roomCode', normalizedCode);
 
       // Navigate to game with state to avoid race condition
       navigate('/play', {
         state: {
           playerId: player.id,
           roomId: room.id,
-          roomCode: roomCode.toUpperCase()
+          roomCode: normalizedCode
         }
       });
     } catch (error) {
@@ -186,7 +185,7 @@ export default function Join() {
                   placeholder="ABC123"
                   className="font-retro h-12 rounded-none border-[3px] border-ink text-2xl uppercase tracking-[0.3em]"
                   value={roomCode}
-                  onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
+                  onChange={(e) => setRoomCode(normalizeRoomCode(e.target.value))}
                   maxLength={6}
                   disabled={isJoining}
                 />

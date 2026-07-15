@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { useSharedDeadline } from '@/hooks/useSharedDeadline';
 
 interface Player {
   id: string;
@@ -20,11 +21,15 @@ interface ScoreboardProps {
   winnerName?: string;
   winningSubmissions?: Submission[];
   prompt?: string;
-  gameMode: 'judge' | 'voting';
+  gameMode: 'judge' | 'voting' | 'forgery' | 'duel';
   nextJudgeName?: string;
   isHost: boolean;
   onNextRound: () => void;
   onEndGame: () => void;
+  onBackToMenu?: () => void | Promise<void>;
+  automaticFlow?: boolean;
+  autoAdvanceDeadlineAt?: string | null;
+  isFinalRound?: boolean;
 }
 
 export default function Scoreboard({ 
@@ -38,13 +43,19 @@ export default function Scoreboard({
   nextJudgeName, 
   isHost, 
   onNextRound, 
-  onEndGame 
+  onEndGame,
+  onBackToMenu,
+  automaticFlow = false,
+  autoAdvanceDeadlineAt,
+  isFinalRound = false,
 }: ScoreboardProps) {
+  const { timeLeft } = useSharedDeadline(autoAdvanceDeadlineAt, 10);
   const sortedPlayers = [...players].sort((a, b) => b.score - a.score);
   const isMultipleWinners = winnerIds.length > 1;
-  const winnerNames = gameMode === 'voting'
-    ? (winnerIds.map(id => players.find(p => p.id === id)?.name).filter(Boolean) as string[])
-    : (winnerName ? [winnerName] : []);
+  const isJudgeMode = gameMode === 'judge';
+  const winnerNames = isJudgeMode
+    ? (winnerName ? [winnerName] : [])
+    : (winnerIds.map(id => players.find(p => p.id === id)?.name).filter(Boolean) as string[]);
   const displayWinnerText = winnerNames.length > 0 ? winnerNames.join(', ') : '';
 
   return (
@@ -52,7 +63,7 @@ export default function Scoreboard({
       <div className="w-full max-w-4xl space-y-8">
         <div className="text-center space-y-4">
           <h1 className="text-5xl font-bold text-foreground">
-            {isMultipleWinners ? 'Tied Winners!' : 'Round Winner'}
+            {isFinalRound ? 'Final Standings' : isMultipleWinners ? 'Tied Winners!' : 'Round Winner'}
           </h1>
           
           {prompt && (
@@ -62,7 +73,7 @@ export default function Scoreboard({
             </Card>
           )}
 
-          {gameMode === 'voting' && winningSubmissions.length > 0 ? (
+          {!isJudgeMode && winningSubmissions.length > 0 ? (
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {winningSubmissions.map((submission) => {
@@ -90,7 +101,7 @@ export default function Scoreboard({
             )
           )}
 
-          {gameMode === 'judge' && nextJudgeName && (
+          {isJudgeMode && nextJudgeName && (
             <p className="text-xl text-muted-foreground">
               Next Judge: {nextJudgeName}
             </p>
@@ -118,7 +129,31 @@ export default function Scoreboard({
           </div>
         </div>
 
-        {isHost && (
+        {automaticFlow && (
+          <div className="text-center space-y-2">
+            {isFinalRound ? (
+              <p className="text-xl font-semibold text-foreground">Final standings</p>
+            ) : (
+              <p className="text-xl font-semibold text-foreground">
+                Next round starts automatically in {timeLeft}s
+              </p>
+            )}
+            {!isHost && !isFinalRound && (
+              <p className="text-sm text-muted-foreground">No buttons needed — stay on this screen.</p>
+            )}
+          </div>
+        )}
+
+        {isFinalRound && onBackToMenu && (
+          <Button
+            onClick={onBackToMenu}
+            className="w-full h-14 text-xl"
+          >
+            Back to Menu
+          </Button>
+        )}
+
+        {isHost && !automaticFlow && (
           <div className="space-y-3">
             <Button 
               onClick={onNextRound}
@@ -136,7 +171,7 @@ export default function Scoreboard({
           </div>
         )}
 
-        {!isHost && (
+        {!isHost && !automaticFlow && (
           <p className="text-center text-xl text-muted-foreground">Waiting for host...</p>
         )}
       </div>
