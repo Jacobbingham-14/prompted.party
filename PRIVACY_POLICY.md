@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last updated: July 1, 2026**
+**Last updated: July 13, 2026**
 
 This Privacy Policy explains how Prompted.Party ("Prompted.Party," "we," "us," or "our") collects, uses, and shares information when you use our website and game service located at prompted.party (the "Service"). This document is provided as a starting template and has not been reviewed by a lawyer; you should have it reviewed by legal counsel before relying on it, especially if you will process data from users in the EU/UK, California, or other jurisdictions with specific privacy laws.
 
@@ -14,7 +14,7 @@ Prompted.Party is currently operated by an individual developer. If you have que
 - **Account information**: If you create a host account, we collect your email address and password (your password is handled by our authentication provider, Supabase, and is never stored by us in plain text).
 - **Player name and avatar**: When you join a game as a player, you provide a display name and may select or customize an in-game avatar. Player accounts do not require an email address.
 - **Prompts and text you submit**: Any text prompts, answers, or captions you type during gameplay (for example, image prompts, forgery-round guesses, or duel prompts).
-- **AI image generation requests**: The text prompts you submit to generate images are sent to our AI image provider (Replicate, running the Flux image model) solely to generate the requested image.
+- **AI image generation requests**: The text prompts you submit to generate images are sent to our AI image provider (OpenAI, running the GPT Image model) solely to generate the requested image.
 - **Feedback and suggestions**: If you use the in-app suggestion form, we collect the message you submit along with your account information.
 
 ### Information collected automatically
@@ -40,7 +40,7 @@ We do not sell your personal information, and we do not use your prompts or imag
 ## 4. How Information Is Shared
 
 We share information only as follows:
-- **Service providers**: We use Supabase for authentication, database, and file storage, and Replicate to generate AI images from your prompts. These providers process data on our behalf under their own privacy and security terms.
+- **Service providers**: We use Supabase for authentication, database, and file storage, and OpenAI to generate AI images from your prompts. These providers process data on our behalf under their own privacy and security terms.
 - **Other players**: Your player name, avatar, submitted prompts, generated images, and votes are visible to other players and the host in the same game room, since this is core to gameplay.
 - **Legal reasons**: We may disclose information if required by law, or to protect the rights, property, or safety of Prompted.Party, our users, or others.
 - **Business transfers**: If Prompted.Party is involved in a merger, acquisition, or sale of assets, information may be transferred as part of that transaction.
@@ -76,7 +76,7 @@ Our Service is hosted using infrastructure that may process and store data in th
 
 Our Service integrates with third-party providers, including:
 - **Supabase** (authentication, database, storage)
-- **Replicate / Flux (Black Forest Labs)** (AI image generation)
+- **OpenAI / GPT Image** (AI image generation)
 - **Vercel** (hosting)
 
 These providers have their own privacy policies governing their handling of data, and we encourage you to review them.

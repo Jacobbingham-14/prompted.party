@@ -1,4 +1,3 @@
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { PlayerAvatar } from '@/components/PlayerAvatar';
 import FullscreenButton from '@/components/FullscreenButton';
@@ -45,8 +44,7 @@ interface HostDuelVotingProps {
   totalMatchups: number;
   eligibleVoters: number;
   deadlineAt?: string | null;
-  onReveal: () => void;
-  onNext: () => void;
+  revealSeconds?: number;
 }
 
 export default function HostDuelVoting({
@@ -60,8 +58,7 @@ export default function HostDuelVoting({
   totalMatchups,
   eligibleVoters,
   deadlineAt,
-  onReveal,
-  onNext,
+  revealSeconds = 7,
 }: HostDuelVotingProps) {
   const revealed = matchup.status === 'revealed';
   const { timeLeft } = useSharedDeadline(deadlineAt, 30);
@@ -71,9 +68,7 @@ export default function HostDuelVoting({
   const votesFor = (id: string) => votes.filter((v) => v.matchup_id === matchup.id && v.voted_player_id === id).length;
   const votesCast = votes.filter((v) => v.matchup_id === matchup.id).length;
 
-  const isLast = matchupIndex >= totalMatchups - 1;
-
-  const side = (playerId: string) => {
+  const side = (playerId: string, answerLabel: string) => {
     const player = getPlayer(playerId);
     const sub = subFor(playerId);
     const count = votesFor(playerId);
@@ -86,7 +81,11 @@ export default function HostDuelVoting({
       >
         <div className="relative aspect-square bg-muted">
           {sub?.image_url ? (
-            <img src={sub.image_url} alt={`${player?.name}'s answer`} className="w-full h-full object-cover" />
+            <img
+              src={sub.image_url}
+              alt={revealed ? `${player?.name}'s answer` : answerLabel}
+              className="w-full h-full object-cover"
+            />
           ) : (
             <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground">
               <ImageOff className="w-10 h-10 mb-2" />
@@ -105,10 +104,14 @@ export default function HostDuelVoting({
           )}
         </div>
         <div className="p-4 bg-card space-y-2">
-          <div className="flex items-center gap-2">
-            <PlayerAvatar name={player?.name || '?'} avatarUrl={player?.avatar_url} size="sm" />
-            <span className="font-semibold">{player?.name || 'Unknown'}</span>
-          </div>
+          {revealed ? (
+            <div className="flex items-center gap-2">
+              <PlayerAvatar name={player?.name || '?'} avatarUrl={player?.avatar_url} size="sm" />
+              <span className="font-semibold">{player?.name || 'Unknown'}</span>
+            </div>
+          ) : (
+            <p className="font-bold uppercase tracking-wide">{answerLabel}</p>
+          )}
           {revealed && sub?.answer_text && (
             <p className="text-muted-foreground italic">"{sub.answer_text}"</p>
           )}
@@ -123,6 +126,7 @@ export default function HostDuelVoting({
       <div className="w-full max-w-5xl space-y-6">
         <div className="text-center space-y-2">
           <div className="flex items-center justify-center gap-2">
+            <Badge variant="outline" className="px-3 py-1">Round {roundNumber}</Badge>
             <Badge variant="outline" className="px-3 py-1">Duel {matchupIndex + 1} / {totalMatchups}</Badge>
             <Badge variant="secondary" className="px-3 py-1">🏆 {pointsPerVote} pts per vote</Badge>
             {!revealed && (
@@ -144,22 +148,18 @@ export default function HostDuelVoting({
         </div>
 
         <div className="flex flex-col md:flex-row items-stretch gap-4 md:gap-6">
-          {side(matchup.player_a_id)}
+          {side(matchup.player_a_id, 'Answer A')}
           <div className="flex items-center justify-center">
             <span className="text-2xl font-black text-muted-foreground">VS</span>
           </div>
-          {side(matchup.player_b_id)}
+          {side(matchup.player_b_id, 'Answer B')}
         </div>
 
-        <div className="flex justify-center">
-          {!revealed ? (
-            <Button onClick={onReveal} size="lg" className="px-10">Reveal Winner</Button>
-          ) : (
-            <Button onClick={onNext} size="lg" className="px-10">
-              {isLast ? 'Finish Round' : 'Next Duel'}
-            </Button>
-          )}
-        </div>
+        <p className="text-center text-sm text-muted-foreground">
+          {revealed
+            ? `Next duel begins automatically in about ${revealSeconds} seconds.`
+            : 'The winner reveals when everyone votes or the timer expires.'}
+        </p>
       </div>
     </div>
   );

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Sparkles, Check, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Loader2, Sparkles, Check, AlertTriangle } from 'lucide-react';
 import { useSharedDeadline } from '@/hooks/useSharedDeadline';
 import { isValidDuelAnswer } from '@/lib/duelPrompt';
 
@@ -27,6 +27,7 @@ interface DuelSubmissionProps {
   roundNumber: number;
   pointsPerVote: number;
   deadlineAt?: string | null;
+  acceptingAnswers?: boolean;
   onSubmitAnswer: (matchupId: string, answer: string) => Promise<void>;
 }
 
@@ -37,6 +38,7 @@ export default function DuelSubmission({
   roundNumber,
   pointsPerVote,
   deadlineAt,
+  acceptingAnswers = true,
   onSubmitAnswer,
 }: DuelSubmissionProps) {
   const { timeLeft } = useSharedDeadline(deadlineAt, 180);
@@ -52,6 +54,7 @@ export default function DuelSubmission({
   const allReady = matchups.length > 0 && readyCount === matchups.length;
 
   const submit = async (m: DuelMatchupLite) => {
+    if (subFor(m.id) || !acceptingAnswers) return;
     const answer = draftFor(m).trim();
     if (!isValidDuelAnswer(answer)) return;
     setBusy((b) => ({ ...b, [m.id]: true }));
@@ -88,6 +91,7 @@ export default function DuelSubmission({
           const sub = subFor(m.id);
           const status = sub?.image_status;
           const isBusy = busy[m.id] || status === 'generating';
+          const isSubmitted = Boolean(sub);
           const value = draftFor(m);
 
           return (
@@ -118,12 +122,12 @@ export default function DuelSubmission({
                     onChange={(e) => setDrafts((d) => ({ ...d, [m.id]: e.target.value }))}
                     placeholder="Type your funniest answer…"
                     maxLength={200}
-                    disabled={isBusy}
+                    disabled={isBusy || isSubmitted || !acceptingAnswers}
                     className="min-h-[80px] resize-none text-base"
                   />
                   {status === 'failed' && (
                     <p className="text-sm text-destructive flex items-center gap-1">
-                      <AlertTriangle className="w-4 h-4" /> Image generation failed. Try again.
+                      <AlertTriangle className="w-4 h-4" /> Image generation failed, but your answer is locked in.
                     </p>
                   )}
                 </>
@@ -133,15 +137,15 @@ export default function DuelSubmission({
                 <span className="text-xs text-muted-foreground">{value.length}/200</span>
                 <Button
                   onClick={() => submit(m)}
-                  disabled={isBusy || !isValidDuelAnswer(value)}
+                  disabled={isBusy || isSubmitted || !acceptingAnswers || !isValidDuelAnswer(value)}
                   className="min-w-[140px]"
                 >
                   {isBusy ? (
                     <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating…</>
-                  ) : status === 'ready' ? (
-                    <><RefreshCw className="w-4 h-4 mr-2" /> Redo</>
-                  ) : status === 'failed' ? (
-                    <><RefreshCw className="w-4 h-4 mr-2" /> Retry</>
+                  ) : isSubmitted ? (
+                    <><Check className="w-4 h-4 mr-2" /> Locked in</>
+                  ) : !acceptingAnswers ? (
+                    <>Time's up</>
                   ) : (
                     <><Sparkles className="w-4 h-4 mr-2" /> Submit</>
                   )}
@@ -154,7 +158,14 @@ export default function DuelSubmission({
         {allReady && (
           <div className="text-center py-4 space-y-1">
             <p className="text-xl font-bold text-foreground">You're all set! 🎉</p>
-            <p className="text-muted-foreground">Sit tight — waiting for the host to start the duels.</p>
+            <p className="text-muted-foreground">Sit tight — voting starts automatically.</p>
+          </div>
+        )}
+
+        {!acceptingAnswers && !allReady && (
+          <div className="text-center py-4 space-y-1">
+            <p className="text-xl font-bold text-foreground">Time's up!</p>
+            <p className="text-muted-foreground">Finishing the images before voting begins.</p>
           </div>
         )}
       </div>

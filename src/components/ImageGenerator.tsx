@@ -87,13 +87,8 @@ export const ImageGenerator = ({ onImageReady, onClose, prompt: initialPrompt, r
     setIsGenerating(true);
 
     try {
-      // Always use a fresh random seed. There's no image-to-image conditioning
-      // here (Replicate only ever gets a text prompt, no reference image), so
-      // reusing a seed across generations doesn't produce "the same shot with
-      // a small tweak" -- it just constrains flux-schnell's diffusion noise,
-      // which collapses subsequent generations toward a near-identical
-      // composition regardless of prompt changes. That's why every image after
-      // a player's first one used to look the same.
+      // GPT Image does not expose deterministic seeds, so every request is a
+      // fresh generation based on the current text prompt.
       const seedToUse: number | undefined = undefined;
 
       const { data, error } = await supabase.functions.invoke('generate-image', {

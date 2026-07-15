@@ -1,5 +1,4 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import Replicate from "https://esm.sh/replicate@0.25.2"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
 
 const corsHeaders = {
@@ -13,9 +12,9 @@ serve(async (req) => {
   }
 
   try {
-    const black_forest_labs_flux_schnell = Deno.env.get('black_forest_labs_flux_schnell')
-    if (!black_forest_labs_flux_schnell) {
-      throw new Error('black_forest_labs_flux_schnell is not configured')
+    const openAIKey = Deno.env.get('OPENAI_API_KEY')
+    if (!openAIKey) {
+      throw new Error('OPENAI_API_KEY is not configured')
     }
 
     const body = await req.json()
@@ -46,7 +45,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Look up host and check generation limit BEFORE calling Replicate
+    // Look up host and check generation limit before spending an API request.
     const { data: room } = await supabaseAdmin
       .from('rooms')
       .select('host_id')
@@ -91,24 +90,52 @@ serve(async (req) => {
     }
     remaining = limit ? Math.max(0, limit.remaining - 1) : null
 
-    const replicate = new Replicate({ auth: black_forest_labs_flux_schnell })
+    const openAIResponse = await fetch('https://api.openai.com/v1/images/generations', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-image-2',
+        prompt: body.prompt,
+        n: 1,
+        size: '1024x1024',
+        quality: 'low',
+        output_format: 'webp',
+        output_compression: 80,
+      }),
+    })
 
-    const input: Record<string, unknown> = {
-      prompt: body.prompt,
-      go_fast: true,
-      megapixels: "1",
-      num_outputs: 1,
-      aspect_ratio: "1:1",
-      output_format: "webp",
-      output_quality: 80,
-      num_inference_steps: 4,
+    const openAIData = await openAIResponse.json()
+    if (!openAIResponse.ok) {
+      throw new Error(openAIData?.error?.message ?? `OpenAI image generation failed (${openAIResponse.status})`)
     }
 
-    if (body.seed !== undefined && body.seed !== null) {
-      input.seed = body.seed
+    const encodedImage = openAIData?.data?.[0]?.b64_json
+    if (!encodedImage || typeof encodedImage !== 'string') {
+      throw new Error('OpenAI did not return an image')
     }
 
-    const output = await replicate.run("black-forest-labs/flux-schnell", { input })
+    const imageBytes = Uint8Array.from(atob(encodedImage), (character) => character.charCodeAt(0))
+    const objectPath = `generated/${body.roomId}/${crypto.randomUUID()}.webp`
+    const { error: uploadError } = await supabaseAdmin.storage
+      .from('game-images')
+      .upload(objectPath, imageBytes, {
+        contentType: 'image/webp',
+        cacheControl: '3600',
+        upsert: false,
+      })
+
+    if (uploadError) {
+      throw new Error(`Unable to store generated image: ${uploadError.message}`)
+    }
+
+    const { data: publicUrlData } = supabaseAdmin.storage
+      .from('game-images')
+      .getPublicUrl(objectPath)
+
+    const output = publicUrlData.publicUrl
 
     // Increment counter after successful generation
     if (hostId) {

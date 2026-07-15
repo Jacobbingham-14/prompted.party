@@ -1,4 +1,3 @@
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { PlayerAvatar } from '@/components/PlayerAvatar';
@@ -24,7 +23,7 @@ interface HostDuelSubmissionProps {
   roundNumber: number;
   pointsPerVote: number;
   deadlineAt?: string | null;
-  onStartVoting: () => void;
+  isGenerationGrace?: boolean;
 }
 
 export default function HostDuelSubmission({
@@ -34,7 +33,7 @@ export default function HostDuelSubmission({
   roundNumber,
   pointsPerVote,
   deadlineAt,
-  onStartVoting,
+  isGenerationGrace = false,
 }: HostDuelSubmissionProps) {
   const { timeLeft } = useSharedDeadline(deadlineAt, 180);
   const readyCount = submissions.filter((s) => s.image_status === 'ready').length;
@@ -52,8 +51,14 @@ export default function HostDuelSubmission({
       <FullscreenButton />
       <div className="w-full max-w-2xl space-y-6">
         <div className="text-center space-y-2">
-          <h1 className="text-4xl font-bold text-foreground">Round {roundNumber}: Writing Answers</h1>
-          <p className="text-muted-foreground">Players are answering their two prompts.</p>
+          <h1 className="text-4xl font-bold text-foreground">
+            Round {roundNumber}: {isGenerationGrace ? 'Finishing Images' : 'Writing Answers'}
+          </h1>
+          <p className="text-muted-foreground">
+            {isGenerationGrace
+              ? 'Answer time is over. Voting begins as soon as the remaining images finish.'
+              : 'Players are answering their two prompts.'}
+          </p>
           <div className="flex items-center justify-center gap-2 pt-1">
             <Badge variant="secondary" className="px-3 py-1">🏆 {pointsPerVote} pts per vote</Badge>
             <Badge variant={timeLeft <= 20 ? 'destructive' : 'secondary'} className="px-3 py-1">⏱️ {timeLeft}s</Badge>
@@ -90,11 +95,8 @@ export default function HostDuelSubmission({
           })}
         </div>
 
-        <Button onClick={onStartVoting} className="w-full" size="lg">
-          Start the Duels
-        </Button>
-        <p className="text-center text-xs text-muted-foreground">
-          You can start now — any missing images will just show as “no submission”.
+        <p className="text-center text-sm text-muted-foreground">
+          Voting starts automatically when everyone is ready or the timer expires.
         </p>
       </div>
     </div>

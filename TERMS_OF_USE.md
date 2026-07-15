@@ -1,6 +1,6 @@
 # Terms of Use
 
-**Last updated: July 1, 2026**
+**Last updated: July 13, 2026**
 
 These Terms of Use ("Terms") govern your access to and use of Prompted.Party, a multiplayer party game where players create and vote on AI-generated images from creative prompts (the "Service"), available at prompted.party. This document is a starting template and has not been reviewed by a lawyer; you should have it reviewed by legal counsel before relying on it. By accessing or using the Service, you agree to be bound by these Terms. If you do not agree, do not use the Service.
 
@@ -25,7 +25,7 @@ Prompted.Party lets a host create a game room that players join via a room code 
 - **Your responsibility**: You are solely responsible for the User Content you submit, including the prompts you use to generate images. You agree not to submit User Content that is illegal, infringing, hateful, sexually explicit, harassing, or otherwise inappropriate, including content involving real identifiable people submitted without their consent, or content intended to harass or bully other players.
 - **License to us**: By submitting User Content, you grant Prompted.Party a non-exclusive, worldwide, royalty-free license to host, store, display, reproduce, and transmit that content as necessary to operate the Service (for example, showing your prompt and generated image to other players in your room).
 - **Visibility**: Prompts, generated images, votes, and scores you submit during a game are visible to other players and the host in that same game room. Do not submit anything you don't want seen by everyone in the room.
-- **AI-generated images**: Images generated through the Service are created by a third-party AI model (Flux, via Replicate) based on the text prompt you provide. AI-generated content can be unpredictable and may occasionally produce unexpected, inaccurate, or objectionable results despite our efforts to select and configure the underlying model responsibly. You use this feature at your own risk and agree not to intentionally craft prompts designed to produce content that violates these Terms.
+- **AI-generated images**: Images generated through the Service are created by a third-party AI model (GPT Image, via OpenAI) based on the text prompt you provide. AI-generated content can be unpredictable and may occasionally produce unexpected, inaccurate, or objectionable results despite our efforts to select and configure the underlying model responsibly. You use this feature at your own risk and agree not to intentionally craft prompts designed to produce content that violates these Terms.
 
 ## 5. Acceptable Use
 
@@ -45,7 +45,7 @@ The Service, including its design, code, graphics, and branding (excluding User 
 
 ## 7. Third-Party Services
 
-The Service relies on third-party providers, including Supabase (authentication, database, and storage) and Replicate/Flux (AI image generation). Your use of the Service is also subject to the availability and acceptable use policies of these providers, and we are not responsible for their downtime, errors, or content moderation decisions.
+The Service relies on third-party providers, including Supabase (authentication, database, and storage) and OpenAI/GPT Image (AI image generation). Your use of the Service is also subject to the availability and acceptable use policies of these providers, and we are not responsible for their downtime, errors, or content moderation decisions.
 
 ## 8. Termination
 

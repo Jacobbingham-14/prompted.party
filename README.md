@@ -20,7 +20,7 @@ npm run dev
 
 Add the following key in the Supabase dashboard (`Project Settings → Configuration → Functions`):
 
-- `REPLICATE_API_KEY` – Replicate key used by the `generate-image` function.
+- `OPENAI_API_KEY` – OpenAI API key used by the `generate-image` function.
 
 ## Deploying edge functions
 

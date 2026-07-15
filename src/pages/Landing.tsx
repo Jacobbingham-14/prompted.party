@@ -38,7 +38,8 @@ import {
 import { validateSuggestionForm } from "@/lib/validation";
 import { usePurchasedGameModes } from "@/hooks/usePurchasedGameModes";
 import { useGenerationLimit } from "@/hooks/useGenerationLimit";
-import { generateRoomCode } from "@/lib/roomCode";
+import { generateRoomCode, normalizeRoomCode } from "@/lib/roomCode";
+import { findRoomByCode } from "@/lib/roomLookup";
 import { startCheckout, type GameMode } from "@/lib/checkout";
 
 interface Room {
@@ -249,7 +250,7 @@ const Landing = () => {
   useEffect(() => {
     const codeFromUrl = searchParams.get('code');
     if (codeFromUrl) {
-      setRoomCode(codeFromUrl.toUpperCase());
+      setRoomCode(normalizeRoomCode(codeFromUrl));
       setMode('join');
     }
   }, [searchParams]);
@@ -362,15 +363,13 @@ const Landing = () => {
   };
 
   const handleJoinRoom = async (name: string, code: string) => {
-    if (!name.trim() || !code.trim()) return;
+    const normalizedCode = normalizeRoomCode(code);
+    if (!name.trim() || !normalizedCode) return;
     if (isJoining) return;
     setIsJoining(true);
 
     try {
-      const { data: roomRows } = await supabase.rpc('find_room_by_code', {
-        room_code: code.toUpperCase()
-      });
-      const room = Array.isArray(roomRows) ? roomRows[0] : roomRows;
+      const { room, code: codeUpper } = await findRoomByCode(normalizedCode);
 
       if (!room) {
         toast({
@@ -427,8 +426,6 @@ const Landing = () => {
         }
         player = created;
       }
-
-      const codeUpper = code.toUpperCase();
 
       // Store session data using separate keys (matching Join.tsx standard)
       localStorage.setItem('playerId', player.id);
@@ -950,8 +947,8 @@ const Landing = () => {
               <Input
                 placeholder="Room code"
                 value={roomCode}
-                onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
-                maxLength={12}
+                onChange={(e) => setRoomCode(normalizeRoomCode(e.target.value))}
+                maxLength={6}
                 disabled={isJoining}
                 className="h-12 rounded-none border-[3px] border-ink font-retro text-2xl tracking-[0.3em] uppercase"
               />
