@@ -18,3 +18,8 @@ verify_jwt = false
 # Checks the caller's session itself via auth.getUser (matches the live deploy).
 [functions.create-checkout-session]
 verify_jwt = false
+
+# Guest buyers returning from Stripe have no Supabase session yet; the function
+# authorizes via the Stripe Checkout Session instead.
+[functions.claim-checkout]
+verify_jwt = false

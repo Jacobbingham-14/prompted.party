@@ -5,12 +5,34 @@
 // grants modes/credits atomically, using purchase_events.stripe_session_id as
 // the idempotency key.
 //
+// Guest checkouts (no host_id in metadata) are fulfilled onto the account for
+// the checkout email, creating it if needed; claim-checkout then signs the
+// buyer in.
+//
 // Must be deployed with verify_jwt = false (see supabase/config.toml): Stripe
 // doesn't send a Supabase JWT, and the signature check below is the auth.
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import Stripe from "https://esm.sh/stripe@14.21.0?target=deno"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
+
+async function findOrCreateUserByEmail(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  email: string
+): Promise<string> {
+  const { data: existingId, error } = await supabaseAdmin.rpc('find_user_id_by_email', { p_email: email })
+  if (error) throw error
+  if (existingId) return existingId as string
+
+  const { data, error: createError } = await supabaseAdmin.auth.admin.createUser({ email, email_confirm: true })
+  if (createError) {
+    // A concurrent redelivery of the same event may have just created it.
+    const { data: retryId } = await supabaseAdmin.rpc('find_user_id_by_email', { p_email: email })
+    if (retryId) return retryId as string
+    throw createError
+  }
+  return data.user.id
+}
 
 serve(async (req) => {
   try {
@@ -44,10 +66,9 @@ serve(async (req) => {
 
     const session = event.data.object as Stripe.Checkout.Session
     const metadata = session.metadata ?? {}
-    const hostId = metadata.host_id
     const kind = metadata.kind as 'full_access' | 'credits' | undefined
 
-    if (!hostId || !kind) {
+    if (!kind) {
       console.error('Missing metadata on checkout session', session.id)
       return new Response(JSON.stringify({ received: true, warning: 'missing metadata' }), { status: 200 })
     }
@@ -56,6 +77,18 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
+
+    // Signed-in buyers carry host_id; guest buyers get the account for the
+    // email they entered at checkout, created here if it doesn't exist yet.
+    let hostId = metadata.host_id
+    if (!hostId) {
+      const email = session.customer_details?.email ?? session.customer_email
+      if (!email) {
+        console.error('Guest checkout session has no email; purchase NOT fulfilled', session.id)
+        return new Response(JSON.stringify({ received: true, warning: 'missing email' }), { status: 200 })
+      }
+      hostId = await findOrCreateUserByEmail(supabaseAdmin, email)
+    }
 
     const amountCents = session.amount_total ?? 0
     const paymentIntentId = typeof session.payment_intent === 'string' ? session.payment_intent : null

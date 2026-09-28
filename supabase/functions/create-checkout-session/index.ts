@@ -6,6 +6,8 @@
 //   - credits: an additional image-generation credit pack (1000 credits / $5,
 //     any multiple), for after the included 1000 run out
 //
+// Full access doesn't require being signed in (guest checkout); credits do.
+//
 // Price IDs come from Stripe (created in the dashboard — see STRIPE_SETUP.md)
 // and are read from env vars so no dollar amounts are hardcoded here.
 
@@ -32,28 +34,26 @@ serve(async (req) => {
 
     const stripe = new Stripe(stripeSecret, { apiVersion: '2023-10-16', httpClient: Stripe.createFetchHttpClient() })
 
-    // Identify the purchasing host from their Supabase auth session
+    // Identify the buyer from their Supabase auth session, if they have one.
+    // Full access can be bought as a guest: Stripe collects the email and the
+    // stripe-webhook function creates the account from it. When logged out,
+    // supabase-js sends the anon key here, which getUser() rejects -> guest.
+    let user: { id: string; email?: string } | null = null
     const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'Missing Authorization header' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 })
-    }
+    if (authHeader) {
+      // Extract the bearer token and validate it explicitly. Calling
+      // supabase.auth.getUser() with no argument tries to read a session from
+      // local storage, which doesn't exist in the Deno edge runtime -- passing
+      // the header alone via `global.headers` is not enough on its own.
+      const jwt = authHeader.replace(/^Bearer\s+/i, '')
 
-    // Extract the bearer token and validate it explicitly. Calling
-    // supabase.auth.getUser() with no argument tries to read a session from
-    // local storage, which doesn't exist in the Deno edge runtime -- passing
-    // the header alone via `global.headers` is not enough on its own.
-    const jwt = authHeader.replace(/^Bearer\s+/i, '')
-
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
-    )
-    const { data: { user }, error: userError } = await supabase.auth.getUser(jwt)
-    if (userError || !user) {
-      return new Response(JSON.stringify({ error: 'Not authenticated' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 })
+      const supabase = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+        { global: { headers: { Authorization: authHeader } } }
+      )
+      const { data } = await supabase.auth.getUser(jwt)
+      user = data.user ?? null
     }
 
     const body = await req.json()
@@ -62,7 +62,7 @@ serve(async (req) => {
 
     let priceId: string
     let mode: 'payment' = 'payment'
-    let metadata: Record<string, string> = { host_id: user.id }
+    let metadata: Record<string, string> = user ? { host_id: user.id } : {}
 
     switch (body.type) {
       case 'full_access': {
@@ -71,6 +71,11 @@ serve(async (req) => {
         break
       }
       case 'credits': {
+        // Credits top up an existing account, so they need one.
+        if (!user) {
+          return new Response(JSON.stringify({ error: 'Sign in to buy more credits' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 })
+        }
         const packs = Number(body.creditPacks)
         if (!Number.isInteger(packs) || packs < 1 || packs > 20) {
           // cap at 20 packs (=20,000 credits/$100) per checkout to limit abuse/fat-finger errors
@@ -100,7 +105,10 @@ serve(async (req) => {
       payment_method_types: ['card'],
       line_items: [{ price: priceId, quantity }],
       metadata,
-      success_url: `${origin}/?purchase=success`,
+      ...(user?.email ? { customer_email: user.email } : {}),
+      // claim-checkout uses the session id to sign guest buyers into the
+      // account created for them.
+      success_url: `${origin}/?purchase=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/?purchase=cancelled`,
     })
 

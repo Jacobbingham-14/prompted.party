@@ -11,7 +11,7 @@ interface AuthProps {
   onAuthSuccess?: (user: User) => void;
 }
 
-type AuthView = 'form' | 'pending-verification' | 'forgot-password' | 'reset-sent';
+type AuthView = 'form' | 'pending-verification' | 'forgot-password' | 'reset-sent' | 'link-sent';
 
 export default function Auth({ onAuthSuccess }: AuthProps) {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -114,6 +114,35 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
     }
   };
 
+  // Accounts created at guest checkout have no password, so they sign in by
+  // email link. shouldCreateUser: false keeps this from becoming a sign-up path.
+  const handleSendSignInLink = async () => {
+    if (!email) {
+      toast({ title: 'Enter your email first', variant: 'destructive' });
+      return;
+    }
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          shouldCreateUser: false,
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+      if (error) throw error;
+      setView('link-sent');
+    } catch (error) {
+      toast({
+        title: 'Failed to send sign-in link',
+        description: error instanceof Error ? error.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -206,6 +235,33 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
     );
   }
 
+  // Sign-in link sent confirmation
+  if (view === 'link-sent') {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="w-full max-w-md space-y-6 text-center">
+          <div className="flex justify-center">
+            <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
+              <Mail className="w-8 h-8 text-primary" />
+            </div>
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-foreground mb-2">Check your email</h1>
+            <p className="text-muted-foreground">
+              We sent a sign-in link to <strong>{email}</strong>. Open it on this device to log in.
+            </p>
+          </div>
+          <button
+            onClick={() => setView('form')}
+            className="text-sm text-muted-foreground hover:text-foreground"
+          >
+            Back to sign in
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // Reset email sent confirmation
   if (view === 'reset-sent') {
     return (
@@ -280,6 +336,15 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
               ? 'Already have an account? Log in'
               : "Don't have an account? Sign up"}
           </button>
+          {!isSignUp && (
+            <button
+              onClick={handleSendSignInLink}
+              disabled={loading}
+              className="text-sm text-muted-foreground hover:text-foreground block w-full"
+            >
+              Email me a sign-in link instead
+            </button>
+          )}
           {!isSignUp && (
             <button
               onClick={() => setView('forgot-password')}

@@ -39,7 +39,7 @@ import { validateSuggestionForm } from "@/lib/validation";
 import { usePurchasedGameModes } from "@/hooks/usePurchasedGameModes";
 import { useGenerationLimit } from "@/hooks/useGenerationLimit";
 import { generateRoomCode } from "@/lib/roomCode";
-import { startCheckout, type GameMode } from "@/lib/checkout";
+import { startCheckout, claimCheckout, type GameMode } from "@/lib/checkout";
 
 interface Room {
   id: string;
@@ -212,10 +212,12 @@ const Landing = () => {
   const allModesOwned = ALL_MODES.every((m) => ownedModes.has(m));
 
   const buyModes = async (payload: Parameters<typeof startCheckout>[0]) => {
-    if (!user) {
+    // Full access can be bought signed out; the account is created from the
+    // email entered at Stripe Checkout. Credit top-ups need an account.
+    if (!user && payload.type !== 'full_access') {
       toast({
         title: "Please log in first",
-        description: "You need to be signed in to unlock and pay for a game mode.",
+        description: "You need to be signed in to buy more image credits.",
         variant: "destructive",
       });
       return;
@@ -233,9 +235,88 @@ const Landing = () => {
     }
   };
 
-  // If we just came back from a successful Stripe checkout, refresh ownership
+  // Coming back from Stripe Checkout: wait for the webhook to fulfill the
+  // purchase, sign guest buyers into their new account, then show the modes.
+  const pendingPurchaseSession = useRef(
+    searchParams.get('purchase') === 'success' ? searchParams.get('session_id') : null
+  );
+  const purchaseClaimStarted = useRef(false);
+  const [finishingPurchase, setFinishingPurchase] = useState(!!pendingPurchaseSession.current);
+
   useEffect(() => {
-    if (searchParams.get('purchase') === 'success') {
+    const sessionId = pendingPurchaseSession.current;
+    if (!sessionId || purchaseClaimStarted.current) return;
+    purchaseClaimStarted.current = true;
+
+    const finishPurchase = async (): Promise<string> => {
+      for (let attempt = 0; attempt < 20; attempt++) {
+        const result = await claimCheckout(sessionId);
+        switch (result.status) {
+          case 'pending':
+            await new Promise((resolve) => setTimeout(resolve, 1500));
+            continue;
+          case 'unpaid':
+            toast({ title: "Payment not completed", description: "You weren't charged.", variant: "destructive" });
+            return '/';
+          case 'sign_in': {
+            const { error } = await supabase.auth.verifyOtp({ token_hash: result.tokenHash, type: 'magiclink' });
+            if (error) throw error;
+            toast({
+              title: "You're all set!",
+              description: `Everything is unlocked. Your account is ${result.email} — use "Email me a sign-in link" to log in on other devices.`,
+            });
+            setMode('create');
+            return '/';
+          }
+          case 'existing_account': {
+            const { data: { session: current } } = await supabase.auth.getSession();
+            if (current?.user?.email?.toLowerCase() !== result.email.toLowerCase()) {
+              toast({
+                title: "Purchase complete!",
+                description: `Everything is unlocked on ${result.email}. Sign in with that email to start playing.`,
+              });
+              return '/auth?next=host';
+            }
+            await refetchOwnedModes();
+            toast({ title: "Purchase complete!", description: "Your unlock is ready." });
+            setMode('create');
+            return '/';
+          }
+          case 'complete':
+            await refetchOwnedModes();
+            toast({ title: "Purchase complete!", description: "Your unlock is ready." });
+            setMode('create');
+            return '/';
+        }
+      }
+      toast({
+        title: "Payment received",
+        description: "We're still finishing up your unlock. Refresh in a minute; if nothing changes, contact support.",
+      });
+      return '/';
+    };
+
+    finishPurchase()
+      .catch((err) => {
+        toast({
+          title: "Couldn't finish setting up your purchase",
+          description: `${getUserFriendlyErrorMessage(err)} You were charged, so contact support if this doesn't resolve.`,
+          variant: "destructive",
+        });
+        return '/';
+      })
+      .then((destination) => {
+        deepLinkHandled.current = true;
+        pendingPurchaseSession.current = null;
+        setFinishingPurchase(false);
+        navigate(destination, { replace: true });
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Old-style success redirect (no session id), e.g. a checkout started before this deploy
+  useEffect(() => {
+    if (searchParams.get('purchase') === 'success' && !searchParams.get('session_id')) {
       refetchOwnedModes();
       toast({ title: "Purchase complete!", description: "Your unlock is ready." });
     }
@@ -283,6 +364,7 @@ const Landing = () => {
 
   useEffect(() => {
     if (deepLinkHandled.current) return;
+    if (pendingPurchaseSession.current) return; // the purchase-return flow picks the mode
 
     if (pendingHostRedirect.current) {
       if (!user) return; // wait for the auth session to resolve
@@ -605,6 +687,16 @@ const Landing = () => {
     },
   ];
 
+  if (finishingPurchase) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4 p-4 text-center">
+        <Loader2 className="w-10 h-10 animate-spin text-primary" />
+        <p className="font-pixel text-sm leading-relaxed">FINISHING YOUR PURCHASE</p>
+        <p className="font-retro text-lg text-muted-foreground">Setting up your account and unlocking every mode…</p>
+      </div>
+    );
+  }
+
   return (
     <div className={`min-h-screen bg-background ${mode === 'marketing' ? 'pb-14' : ''}`}>
       {/* Header — gallery signage */}
@@ -704,7 +796,7 @@ const Landing = () => {
               </Button>
             )}
             {mode === 'marketing' && (
-              <Button onClick={() => user ? setMode('create') : navigate('/auth?next=host')}>
+              <Button onClick={() => setMode('create')}>
                 Get Started <ArrowRight className="ml-2 w-4 h-4" />
               </Button>
             )}
@@ -759,7 +851,7 @@ const Landing = () => {
             </div>
 
             <Button
-              onClick={() => user ? setMode('create') : navigate('/auth?next=host')}
+              onClick={() => setMode('create')}
               className="w-full"
               variant="default"
             >
@@ -795,6 +887,14 @@ const Landing = () => {
                 ? 'All game modes unlocked'
                 : 'One-time $19.99 unlock gets all 4 game modes + 1000 image generations'}
             </p>
+            {!user && (
+              <p className="font-retro text-center text-base text-muted-foreground -mt-2">
+                Already unlocked?{' '}
+                <button className="underline hover:text-foreground" onClick={() => navigate('/auth?next=host')}>
+                  Sign in
+                </button>
+              </p>
+            )}
 
             {user && (
               <div className="flex flex-wrap items-center justify-between gap-2 border-2 border-ink bg-paper/60 px-3 py-1.5 font-retro text-base shrink-0">
@@ -1013,7 +1113,7 @@ const Landing = () => {
                   <div className="flex min-w-[250px] flex-col gap-4">
                     <Button
                       size="lg"
-                      onClick={() => user ? setMode('create') : navigate('/auth?next=host')}
+                      onClick={() => setMode('create')}
                       className="h-14"
                     >
                       Host an exhibition
@@ -1278,7 +1378,7 @@ const Landing = () => {
                   <div className="flex flex-col sm:flex-row gap-4 justify-center">
                     <Button
                       size="lg"
-                      onClick={() => user ? setMode('create') : navigate('/auth?next=host')}
+                      onClick={() => setMode('create')}
                       className="h-14 px-8"
                     >
                       <Users className="mr-2 w-5 h-5" />
