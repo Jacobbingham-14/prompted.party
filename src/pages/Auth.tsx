@@ -68,11 +68,11 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
     setLoading(true);
     try {
       const { error } = await supabase.auth.signInWithOtp({
-        email,
+        email: email.trim(),
         options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
       });
       if (error) throw error;
-      sessionStorage.setItem(PENDING_EMAIL_KEY, email);
+      sessionStorage.setItem(PENDING_EMAIL_KEY, email.trim());
       setCode('');
       setView('check-email');
     } catch (error) {
@@ -95,7 +95,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
     e.preventDefault();
     setLoading(true);
     try {
-      const { error } = await supabase.auth.verifyOtp({ email, token: code.trim(), type: 'email' });
+      const { error } = await supabase.auth.verifyOtp({ email: email.trim(), token: code.trim(), type: 'email' });
       if (error) throw error;
       // onAuthStateChange handles the redirect.
       toast({ title: "You're signed in!" });
