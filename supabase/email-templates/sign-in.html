@@ -1,0 +1,24 @@
+<!--
+  Paste into Supabase: Authentication -> Emails -> Templates, for BOTH
+  "Magic Link" (returning hosts) and "Confirm signup" (first-time hosts).
+  Subject for both: Your Prompted sign-in code: {{ .Token }}
+-->
+<div style="background:#f3eee3;padding:32px 16px;font-family:'Courier New',Courier,monospace;color:#1d1a16;">
+  <div style="max-width:440px;margin:0 auto;background:#fffaf0;border:3px solid #1d1a16;padding:28px 24px;text-align:center;">
+    <p style="margin:0 0 4px;font-size:13px;letter-spacing:3px;color:#1f7a74;">PROMPTED</p>
+    <h1 style="margin:0 0 20px;font-size:22px;">Sign in to host</h1>
+
+    <a href="{{ .ConfirmationURL }}"
+       style="display:inline-block;background:#c9a13b;color:#1d1a16;border:3px solid #1d1a16;padding:14px 28px;font-weight:bold;font-size:16px;text-decoration:none;letter-spacing:1px;">
+      SIGN IN
+    </a>
+
+    <p style="margin:24px 0 8px;font-size:14px;">Signing in on a different device? Type this code instead:</p>
+    <p style="margin:0 0 24px;font-size:30px;font-weight:bold;letter-spacing:8px;">{{ .Token }}</p>
+
+    <p style="margin:0;font-size:12px;color:#6b645a;">
+      This expires soon and can only be used once.<br />
+      Didn't ask for this? You can ignore it.
+    </p>
+  </div>
+</div>
