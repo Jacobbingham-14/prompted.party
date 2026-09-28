@@ -11,7 +11,7 @@ interface AuthProps {
   onAuthSuccess?: (user: User) => void;
 }
 
-type AuthView = 'email' | 'check-email';
+type AuthView = 'email' | 'check-email' | 'no-account';
 
 // Survives a refresh while the host goes to fetch the email.
 const PENDING_EMAIL_KEY = 'pendingSignInEmail';
@@ -19,8 +19,10 @@ const PENDING_EMAIL_KEY = 'pendingSignInEmail';
 /**
  * Passwordless sign-in. The email contains both a sign-in button (signs in
  * whichever device opens it) and a one-time code (for signing in a different
- * device, e.g. reading email on a phone but hosting from a laptop). New
- * emails get an account automatically; hosting still requires a purchase.
+ * device, e.g. reading email on a phone but hosting from a laptop).
+ *
+ * Accounts are only created by buying the game (stripe-webhook creates them
+ * from the checkout email), so an unknown email is told to buy instead.
  */
 export default function Auth({ onAuthSuccess }: AuthProps) {
   const [view, setView] = useState<AuthView>('email');
@@ -69,8 +71,18 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
     try {
       const { error } = await supabase.auth.signInWithOtp({
         email: email.trim(),
-        options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+        options: {
+          shouldCreateUser: false,
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
       });
+      // Supabase reports an unknown email as "signups not allowed" when
+      // shouldCreateUser is false (or sign-ups are off project-wide).
+      if (error && (error.code === 'otp_disabled' || error.code === 'signup_disabled')) {
+        sessionStorage.removeItem(PENDING_EMAIL_KEY);
+        setView('no-account');
+        return;
+      }
       if (error) throw error;
       sessionStorage.setItem(PENDING_EMAIL_KEY, email.trim());
       setCode('');
@@ -109,6 +121,36 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
       setLoading(false);
     }
   };
+
+  if (view === 'no-account') {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="w-full max-w-md space-y-6 text-center">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground mb-2">No account for that email</h1>
+            <p className="text-muted-foreground">
+              We couldn't find an account for <strong>{email.trim()}</strong>. Accounts are created when
+              you buy the game — it's a one-time $19.99 for all four game modes.
+            </p>
+          </div>
+          <Button onClick={() => navigate('/?mode=host')} className="w-full h-12 text-lg">
+            Buy the game
+          </Button>
+          <div className="space-y-2">
+            <button
+              onClick={() => setView('email')}
+              className="text-sm text-muted-foreground hover:text-foreground block w-full"
+            >
+              Try a different email
+            </button>
+            <p className="text-sm text-muted-foreground">
+              Already paid? Use the email you entered at checkout.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (view === 'check-email') {
     return (
@@ -169,7 +211,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
         <div className="text-center">
           <h1 className="text-3xl font-bold text-foreground mb-2">Host Sign In</h1>
           <p className="text-muted-foreground">
-            No password needed. We'll email you a sign-in link.
+            No password needed. Enter the email you bought the game with and we'll send you a sign-in link.
           </p>
         </div>
 

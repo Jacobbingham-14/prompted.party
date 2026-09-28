@@ -367,7 +367,8 @@ const Landing = () => {
     if (pendingPurchaseSession.current) return; // the purchase-return flow picks the mode
 
     if (pendingHostRedirect.current) {
-      if (!user) return; // wait for the auth session to resolve
+      // The mode picker works signed out too (guest checkout), so no need to
+      // wait for the auth session.
       setMode('create');
       deepLinkHandled.current = true;
       navigate('/', { replace: true });
