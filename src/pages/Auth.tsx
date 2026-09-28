@@ -11,13 +11,21 @@ interface AuthProps {
   onAuthSuccess?: (user: User) => void;
 }
 
-type AuthView = 'form' | 'pending-verification' | 'forgot-password' | 'reset-sent' | 'link-sent';
+type AuthView = 'email' | 'check-email';
 
+// Survives a refresh while the host goes to fetch the email.
+const PENDING_EMAIL_KEY = 'pendingSignInEmail';
+
+/**
+ * Passwordless sign-in. The email contains both a sign-in button (signs in
+ * whichever device opens it) and a one-time code (for signing in a different
+ * device, e.g. reading email on a phone but hosting from a laptop). New
+ * emails get an account automatically; hosting still requires a purchase.
+ */
 export default function Auth({ onAuthSuccess }: AuthProps) {
-  const [isSignUp, setIsSignUp] = useState(false);
-  const [view, setView] = useState<AuthView>('form');
+  const [view, setView] = useState<AuthView>('email');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -30,111 +38,46 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
   };
 
   useEffect(() => {
-    // Check if already logged in
+    const finish = (user: User) => {
+      sessionStorage.removeItem(PENDING_EMAIL_KEY);
+      onAuthSuccess?.(user);
+      navigate(getRedirectPath());
+    };
+
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        if (onAuthSuccess) {
-          onAuthSuccess(session.user);
-        }
-        navigate(getRedirectPath());
-      }
+      if (session?.user) finish(session.user);
     });
 
-    // Restore pending verification state across page refreshes
-    const pending = sessionStorage.getItem('pendingVerification');
+    // Clicking the email button in another tab of this browser signs this tab
+    // in too, so move on without making them type the code.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) finish(session.user);
+    });
+
+    const pending = sessionStorage.getItem(PENDING_EMAIL_KEY);
     if (pending) {
       setEmail(pending);
-      setView('pending-verification');
+      setView('check-email');
     }
-  }, [navigate, onAuthSuccess]);
 
-  const handleAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+    return () => subscription.unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-    try {
-      if (isSignUp) {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/auth/callback`,
-          },
-        });
-
-        if (error) throw error;
-
-        // Show verification pending screen
-        sessionStorage.setItem('pendingVerification', email);
-        setView('pending-verification');
-      } else {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-
-        if (error) throw error;
-
-        if (data.user) {
-          sessionStorage.removeItem('pendingVerification');
-          toast({ title: 'Welcome back!' });
-          if (onAuthSuccess) {
-            onAuthSuccess(data.user);
-          }
-          navigate(getRedirectPath());
-        }
-      }
-    } catch (error: any) {
-      toast({
-        title: isSignUp ? 'Sign up failed' : 'Login failed',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleResendVerification = async () => {
-    setLoading(true);
-    try {
-      const { error } = await supabase.auth.resend({
-        type: 'signup',
-        email,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-        },
-      });
-      if (error) throw error;
-      toast({ title: 'Verification email resent!', description: 'Check your inbox.' });
-    } catch (error: any) {
-      toast({ title: 'Failed to resend', description: error.message, variant: 'destructive' });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Accounts created at guest checkout have no password, so they sign in by
-  // email link. shouldCreateUser: false keeps this from becoming a sign-up path.
-  const handleSendSignInLink = async () => {
-    if (!email) {
-      toast({ title: 'Enter your email first', variant: 'destructive' });
-      return;
-    }
+  const sendEmail = async () => {
     setLoading(true);
     try {
       const { error } = await supabase.auth.signInWithOtp({
         email,
-        options: {
-          shouldCreateUser: false,
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-        },
+        options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
       });
       if (error) throw error;
-      setView('link-sent');
+      sessionStorage.setItem(PENDING_EMAIL_KEY, email);
+      setCode('');
+      setView('check-email');
     } catch (error) {
       toast({
-        title: 'Failed to send sign-in link',
+        title: "Couldn't send the email",
         description: error instanceof Error ? error.message : 'Unknown error',
         variant: 'destructive',
       });
@@ -143,24 +86,31 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
     }
   };
 
-  const handleForgotPassword = async (e: React.FormEvent) => {
+  const handleSendEmail = (e: React.FormEvent) => {
+    e.preventDefault();
+    sendEmail();
+  };
+
+  const handleVerifyCode = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
+      const { error } = await supabase.auth.verifyOtp({ email, token: code.trim(), type: 'email' });
       if (error) throw error;
-      setView('reset-sent');
-    } catch (error: any) {
-      toast({ title: 'Failed to send reset email', description: error.message, variant: 'destructive' });
+      // onAuthStateChange handles the redirect.
+      toast({ title: "You're signed in!" });
+    } catch (error) {
+      toast({
+        title: "That code didn't work",
+        description: error instanceof Error ? error.message : 'Unknown error',
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  // Pending email verification screen
-  if (view === 'pending-verification') {
+  if (view === 'check-email') {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="w-full max-w-md space-y-6 text-center">
@@ -172,62 +122,40 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
           <div>
             <h1 className="text-2xl font-bold text-foreground mb-2">Check your email</h1>
             <p className="text-muted-foreground">
-              We sent a verification link to <strong>{email}</strong>. Click the link to activate your account.
+              We sent an email to <strong>{email}</strong>. Tap the button in it to sign in, or type the code here.
             </p>
           </div>
-          <Button
-            onClick={handleResendVerification}
-            variant="outline"
-            className="w-full"
-            disabled={loading}
-          >
-            {loading ? 'Sending...' : 'Resend verification email'}
-          </Button>
-          <button
-            onClick={() => {
-              sessionStorage.removeItem('pendingVerification');
-              setView('form');
-              setIsSignUp(false);
-            }}
-            className="text-sm text-muted-foreground hover:text-foreground"
-          >
-            Back to sign in
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Forgot password screen
-  if (view === 'forgot-password') {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="w-full max-w-md space-y-6">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold text-foreground mb-2">Reset password</h1>
-            <p className="text-muted-foreground">
-              Enter your email and we'll send you a reset link.
-            </p>
-          </div>
-          <form onSubmit={handleForgotPassword} className="space-y-4">
+          <form onSubmit={handleVerifyCode} className="space-y-4">
             <Input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+              placeholder="Code from the email"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={10}
               required
-              className="h-12 text-lg"
+              className="h-12 text-lg text-center tracking-[0.3em]"
             />
-            <Button type="submit" className="w-full h-12 text-lg" disabled={loading}>
-              {loading ? 'Sending...' : 'Send reset link'}
+            <Button type="submit" className="w-full h-12 text-lg" disabled={loading || code.length < 6}>
+              {loading ? 'Checking...' : 'Sign in'}
             </Button>
           </form>
-          <div className="text-center">
+          <div className="space-y-2">
             <button
-              onClick={() => setView('form')}
-              className="text-sm text-muted-foreground hover:text-foreground"
+              onClick={sendEmail}
+              disabled={loading}
+              className="text-sm text-muted-foreground hover:text-foreground block w-full"
             >
-              Back to sign in
+              Didn't get it? Send another email
+            </button>
+            <button
+              onClick={() => {
+                sessionStorage.removeItem(PENDING_EMAIL_KEY);
+                setView('email');
+              }}
+              className="text-sm text-muted-foreground hover:text-foreground block w-full"
+            >
+              Use a different email
             </button>
           </div>
         </div>
@@ -235,125 +163,30 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
     );
   }
 
-  // Sign-in link sent confirmation
-  if (view === 'link-sent') {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="w-full max-w-md space-y-6 text-center">
-          <div className="flex justify-center">
-            <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
-              <Mail className="w-8 h-8 text-primary" />
-            </div>
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground mb-2">Check your email</h1>
-            <p className="text-muted-foreground">
-              We sent a sign-in link to <strong>{email}</strong>. Open it on this device to log in.
-            </p>
-          </div>
-          <button
-            onClick={() => setView('form')}
-            className="text-sm text-muted-foreground hover:text-foreground"
-          >
-            Back to sign in
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Reset email sent confirmation
-  if (view === 'reset-sent') {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="w-full max-w-md space-y-6 text-center">
-          <div className="flex justify-center">
-            <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
-              <Mail className="w-8 h-8 text-primary" />
-            </div>
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground mb-2">Reset link sent</h1>
-            <p className="text-muted-foreground">
-              Check your email at <strong>{email}</strong> for a password reset link.
-            </p>
-          </div>
-          <button
-            onClick={() => setView('form')}
-            className="text-sm text-muted-foreground hover:text-foreground"
-          >
-            Back to sign in
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Main sign in / sign up form
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-6">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-foreground mb-2">
-            {isSignUp ? 'Create Host Account' : 'Host Login'}
-          </h1>
+          <h1 className="text-3xl font-bold text-foreground mb-2">Host Sign In</h1>
           <p className="text-muted-foreground">
-            {isSignUp
-              ? 'Sign up to host and manage games'
-              : 'Log in to host a game'}
+            No password needed. We'll email you a sign-in link.
           </p>
         </div>
 
-        <form onSubmit={handleAuth} className="space-y-4">
+        <form onSubmit={handleSendEmail} className="space-y-4">
           <Input
             type="email"
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            autoComplete="email"
             required
-            className="h-12 text-lg"
-          />
-          <Input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={6}
             className="h-12 text-lg"
           />
           <Button type="submit" className="w-full h-12 text-lg" disabled={loading}>
-            {loading ? 'Loading...' : isSignUp ? 'Sign Up' : 'Log In'}
+            {loading ? 'Sending...' : 'Email me a sign-in link'}
           </Button>
         </form>
-
-        <div className="text-center space-y-2">
-          <button
-            onClick={() => setIsSignUp(!isSignUp)}
-            className="text-sm text-muted-foreground hover:text-foreground block w-full"
-          >
-            {isSignUp
-              ? 'Already have an account? Log in'
-              : "Don't have an account? Sign up"}
-          </button>
-          {!isSignUp && (
-            <button
-              onClick={handleSendSignInLink}
-              disabled={loading}
-              className="text-sm text-muted-foreground hover:text-foreground block w-full"
-            >
-              Email me a sign-in link instead
-            </button>
-          )}
-          {!isSignUp && (
-            <button
-              onClick={() => setView('forgot-password')}
-              className="text-sm text-muted-foreground hover:text-foreground block w-full"
-            >
-              Forgot password?
-            </button>
-          )}
-        </div>
 
         <div className="text-center pt-4">
           <Button variant="outline" onClick={() => navigate('/')} className="w-full">

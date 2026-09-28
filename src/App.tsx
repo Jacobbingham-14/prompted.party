@@ -13,7 +13,6 @@ const Landing = lazy(() => import("./pages/Landing"));
 const Join = lazy(() => import("./pages/Join"));
 const Auth = lazy(() => import("./pages/Auth"));
 const AuthCallback = lazy(() => import("./pages/AuthCallback"));
-const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const PromptsManager = lazy(() => import("./pages/PromptsManager"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -38,7 +37,6 @@ const App = () => (
             <Route path="/join" element={<Join />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/prompts-manager" element={<PromptsManager />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

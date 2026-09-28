@@ -263,7 +263,7 @@ const Landing = () => {
             if (error) throw error;
             toast({
               title: "You're all set!",
-              description: `Everything is unlocked. Your account is ${result.email} — use "Email me a sign-in link" to log in on other devices.`,
+              description: `Everything is unlocked. Your account is ${result.email}; sign in on other devices with just that email.`,
             });
             setMode('create');
             return '/';

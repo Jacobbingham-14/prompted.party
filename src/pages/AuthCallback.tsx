@@ -25,7 +25,7 @@ export default function AuthCallback() {
       if (cancelled) return;
 
       if (session?.user) {
-        sessionStorage.removeItem('pendingVerification');
+        sessionStorage.removeItem('pendingSignInEmail');
         setStatus('success');
         schedule(() => { if (!cancelled) navigate('/'); }, 2000);
       } else {
@@ -35,7 +35,7 @@ export default function AuthCallback() {
           const { data: { session: retrySession } } = await supabase.auth.getSession();
           if (cancelled) return;
           if (retrySession?.user) {
-            sessionStorage.removeItem('pendingVerification');
+            sessionStorage.removeItem('pendingSignInEmail');
             setStatus('success');
             schedule(() => { if (!cancelled) navigate('/'); }, 2000);
           } else {
