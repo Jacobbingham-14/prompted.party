@@ -36,7 +36,7 @@ interface ConversationMessage {
 }
 
 interface ImageGeneratorProps {
-  onImageReady: (file: File, metadata: { imageUrl: string; prompt: string; seed?: number }) => Promise<void> | void;
+  onImageReady: (imageUrl: string, metadata: { prompt: string; seed?: number }) => Promise<void> | void;
   onClose?: () => void;
   prompt?: string;
   roomId?: string;
@@ -163,19 +163,10 @@ export const ImageGenerator = ({ onImageReady, onClose, prompt: initialPrompt, r
     }
   };
 
-  const convertImageToFile = async (imageUrl: string, promptText: string, seed?: number) => {
+  const submitImage = async (imageUrl: string, promptText: string, seed?: number) => {
     setIsPreparingImage(true);
     try {
-      const response = await fetch(imageUrl);
-      if (!response.ok) {
-        throw new Error("Unable to download generated image");
-      }
-
-      const blob = await response.blob();
-      const extension = blob.type.split("/")[1] ?? "webp";
-      const file = new File([blob], `ai-image-${Date.now()}.${extension}`, { type: blob.type || "image/webp" });
-
-      await onImageReady(file, { imageUrl, prompt: promptText, seed });
+      await onImageReady(imageUrl, { prompt: promptText, seed });
       toast({
         title: "Submitted!",
         description: "Your AI-generated image has been submitted successfully.",
@@ -265,7 +256,7 @@ export const ImageGenerator = ({ onImageReady, onClose, prompt: initialPrompt, r
     return (
       <Button
         size="sm"
-        onClick={() => convertImageToFile(msg.imageUrl!, msg.fullPrompt!, msg.seed)}
+        onClick={() => submitImage(msg.imageUrl!, msg.fullPrompt!, msg.seed)}
         disabled={isPreparingImage}
         className="rounded-full text-xs"
       >
@@ -320,7 +311,7 @@ export const ImageGenerator = ({ onImageReady, onClose, prompt: initialPrompt, r
                                 size="sm"
                                 variant="secondary"
                                 className="flex-1"
-                                onClick={() => convertImageToFile(img.url, img.prompt, img.seed)}
+                                onClick={() => submitImage(img.url, img.prompt, img.seed)}
                                 disabled={isPreparingImage}
                               >
                                 {isPreparingImage ? (

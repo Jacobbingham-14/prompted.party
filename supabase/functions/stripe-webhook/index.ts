@@ -1,10 +1,12 @@
 // supabase/functions/stripe-webhook/index.ts
 //
-// Verifies the Stripe webhook signature, then fulfills the purchase by calling
-// the grant_game_modes / grant_generation_credits RPCs (via service role, since
-// those tables have no client-writable RLS policy — only this function can write them).
-// Uses purchase_events.stripe_session_id as an idempotency key so Stripe's
-// at-least-once delivery can't double-grant credits or modes.
+// Verifies the Stripe webhook signature, then fulfills the purchase through the
+// fulfill_purchase RPC (service role only), which records the purchase and
+// grants modes/credits atomically, using purchase_events.stripe_session_id as
+// the idempotency key.
+//
+// Must be deployed with verify_jwt = false (see supabase/config.toml): Stripe
+// doesn't send a Supabase JWT, and the signature check below is the auth.
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import Stripe from "https://esm.sh/stripe@14.21.0?target=deno"
@@ -55,71 +57,39 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Idempotency: if we've already recorded this session, do nothing further.
-    const { data: existing } = await supabaseAdmin
-      .from('purchase_events')
-      .select('id')
-      .eq('stripe_session_id', session.id)
-      .maybeSingle()
-
-    if (existing) {
-      return new Response(JSON.stringify({ received: true, alreadyProcessed: true }), { status: 200 })
-    }
-
     const amountCents = session.amount_total ?? 0
     const paymentIntentId = typeof session.payment_intent === 'string' ? session.payment_intent : null
 
+    let modes: string[] = []
+    let credits = 0
     if (kind === 'full_access') {
-      const modes = (metadata.modes ?? '').split(',').filter(Boolean)
-      const includedCredits = Number(metadata.credits ?? 1000)
-
-      const { error: modesError } = await supabaseAdmin.rpc('grant_game_modes', {
-        p_host_id: hostId,
-        p_modes: modes,
-        p_payment_intent_id: paymentIntentId,
-      })
-      if (modesError) {
-        console.error('grant_game_modes failed:', modesError)
-        return new Response(JSON.stringify({ error: 'Failed to grant game modes' }), { status: 500 })
-      }
-
-      const { error: creditsError } = await supabaseAdmin.rpc('grant_generation_credits', {
-        p_host_id: hostId,
-        p_amount: includedCredits,
-      })
-      if (creditsError) {
-        console.error('grant_generation_credits failed:', creditsError)
-        return new Response(JSON.stringify({ error: 'Failed to grant included credits' }), { status: 500 })
-      }
-
-      await supabaseAdmin.from('purchase_events').insert({
-        host_id: hostId,
-        stripe_session_id: session.id,
-        stripe_payment_intent_id: paymentIntentId,
-        kind,
-        detail: { modes, credits: includedCredits },
-        amount_cents: amountCents,
-      })
+      modes = (metadata.modes ?? '').split(',').filter(Boolean)
+      credits = Number(metadata.credits ?? 1000)
     } else if (kind === 'credits') {
-      const credits = Number(metadata.credits ?? 0)
-      if (credits > 0) {
-        const { error } = await supabaseAdmin.rpc('grant_generation_credits', {
-          p_host_id: hostId,
-          p_amount: credits,
-        })
-        if (error) {
-          console.error('grant_generation_credits failed:', error)
-          return new Response(JSON.stringify({ error: 'Failed to grant credits' }), { status: 500 })
-        }
-      }
-      await supabaseAdmin.from('purchase_events').insert({
-        host_id: hostId,
-        stripe_session_id: session.id,
-        stripe_payment_intent_id: paymentIntentId,
-        kind,
-        detail: { credits },
-        amount_cents: amountCents,
-      })
+      credits = Number(metadata.credits ?? 0)
+    } else {
+      console.error('Unknown purchase kind on checkout session', session.id, kind)
+      return new Response(JSON.stringify({ received: true, warning: 'unknown kind' }), { status: 200 })
+    }
+
+    // Records the session and grants everything in one transaction, keyed on
+    // the session id, so Stripe's at-least-once delivery can't double-grant
+    // and a partial failure can't leave a paid purchase unrecorded.
+    const { data: fulfilled, error: fulfillError } = await supabaseAdmin.rpc('fulfill_purchase', {
+      p_stripe_session_id: session.id,
+      p_host_id: hostId,
+      p_kind: kind,
+      p_modes: modes,
+      p_credits: credits,
+      p_amount_cents: amountCents,
+      p_payment_intent_id: paymentIntentId,
+    })
+    if (fulfillError) {
+      console.error('fulfill_purchase failed:', session.id, fulfillError)
+      return new Response(JSON.stringify({ error: 'Failed to fulfill purchase' }), { status: 500 })
+    }
+    if (fulfilled === false) {
+      return new Response(JSON.stringify({ received: true, alreadyProcessed: true }), { status: 200 })
     }
 
     return new Response(JSON.stringify({ received: true }), { status: 200 })

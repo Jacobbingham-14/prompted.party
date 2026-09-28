@@ -1413,7 +1413,7 @@ const Index = () => {
     }
   });
 
-  const handleImageSubmit = async (file: File) => {
+  const handleImageSubmit = async (imageUrl: string) => {
     console.log('🖼️ Starting image submission...');
     console.log('Player ID:', playerId);
     console.log('Round ID:', currentRound?.id);
@@ -1438,51 +1438,11 @@ const Index = () => {
       return;
     }
 
-    // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
-    if (!allowedTypes.includes(file.type)) {
-      toast({
-        title: "Invalid File Type",
-        description: "Only JPEG, PNG, and WebP images are allowed.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Validate file size (5MB max)
-    const maxSize = 5 * 1024 * 1024;
-    if (file.size > maxSize) {
-      toast({
-        title: "File Too Large",
-        description: "Image must be less than 5MB.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${roomCode}/${currentRound.id}/${playerId}.${fileExt}`;
-
-    const { error: uploadError } = await supabase.storage.from('game-images').upload(fileName, file, {
-      upsert: true
-    });
-
-    if (uploadError) {
-      toast({ 
-        title: 'Upload Failed', 
-        description: 'Failed to upload image. Please try again.',
-        variant: 'destructive' 
-      });
-      console.error('Upload error:', uploadError);
-      return;
-    }
-
-    const { data } = supabase.storage.from('game-images').getPublicUrl(fileName);
-
+    // imageUrl was already saved to game-images by the generate-image function.
     const { error: insertError } = await supabase.from('submissions').insert({
       round_id: currentRound.id,
       player_id: playerId,
-      image_url: data.publicUrl
+      image_url: imageUrl
     });
 
     if (insertError) {
@@ -2172,25 +2132,13 @@ const Index = () => {
       });
       if (error) throw new Error(error.message || 'Failed to generate image');
 
-      const replicateUrl = Array.isArray((data as any).output) ? (data as any).output[0] : (data as any).output;
-      if (!replicateUrl) throw new Error('No image returned');
-
-      // Persist to storage so the URL doesn't expire before voting/reveal.
-      const resp = await fetch(replicateUrl);
-      if (!resp.ok) throw new Error('Could not download generated image');
-      const blob = await resp.blob();
-      const ext = (blob.type.split('/')[1] || 'webp').replace('+xml', '');
-      const fileName = `${roomCode}/${currentRound.id}/duel/${matchupId}_${playerId}.${ext}`;
-      const { error: uploadError } = await supabase.storage
-        .from('game-images')
-        .upload(fileName, blob, { upsert: true, contentType: blob.type || 'image/webp' });
-      if (uploadError) throw uploadError;
-
-      const { data: pub } = supabase.storage.from('game-images').getPublicUrl(fileName);
+      // generate-image already saved the image to game-images, so the URL won't expire.
+      const imageUrl = Array.isArray((data as any).output) ? (data as any).output[0] : (data as any).output;
+      if (!imageUrl) throw new Error('No image returned');
 
       await supabase
         .from('duel_submissions')
-        .update({ image_url: pub.publicUrl, image_status: 'ready', updated_at: new Date().toISOString() })
+        .update({ image_url: imageUrl, image_status: 'ready', updated_at: new Date().toISOString() })
         .eq('matchup_id', matchupId)
         .eq('player_id', playerId);
     } catch (err: any) {

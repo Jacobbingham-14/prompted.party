@@ -46,25 +46,25 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Look up host and check generation limit BEFORE calling Replicate
+    // Look up host and reserve a generation credit BEFORE calling Replicate
     const { data: room } = await supabaseAdmin
       .from('rooms')
-      .select('host_id')
+      .select('host_id, status')
       .eq('id', body.roomId)
       .single()
 
     const hostId: string | null = room?.host_id ?? null
 
-    if (!hostId) {
+    if (!hostId || room?.status === 'ended') {
       return new Response(
         JSON.stringify({ error: "Room not found" }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 }
       )
     }
 
-    let remaining: number | null = null
-
-    const { data: limitData, error: limitError } = await supabaseAdmin.rpc('check_generation_limit', {
+    // Atomic check-and-increment, so simultaneous generations can't all slip
+    // past the limit. Refunded below if the generation fails.
+    const { data: limitData, error: limitError } = await supabaseAdmin.rpc('consume_generation_credit', {
       p_user_id: hostId
     })
 
@@ -77,47 +77,61 @@ serve(async (req) => {
     }
 
     const limit = Array.isArray(limitData) ? limitData[0] : limitData
-    if (limit && !limit.allowed) {
+    if (!limit?.allowed) {
       return new Response(
         JSON.stringify({
           error: 'Generation limit reached',
-          message: `You have used all ${limit.max_limit} generations for this account.`,
-          limit: limit.max_limit,
-          used: limit.current_count,
+          message: `You have used all ${limit?.max_limit} generations for this account.`,
+          limit: limit?.max_limit,
+          used: limit?.current_count,
           remaining: 0,
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 429 }
       )
     }
-    remaining = limit ? Math.max(0, limit.remaining - 1) : null
+    const remaining: number = limit.remaining
 
-    const replicate = new Replicate({ auth: black_forest_labs_flux_schnell })
+    let output: string
+    try {
+      const replicate = new Replicate({ auth: black_forest_labs_flux_schnell })
 
-    const input: Record<string, unknown> = {
-      prompt: body.prompt,
-      go_fast: true,
-      megapixels: "1",
-      num_outputs: 1,
-      aspect_ratio: "1:1",
-      output_format: "webp",
-      output_quality: 80,
-      num_inference_steps: 4,
-    }
-
-    if (body.seed !== undefined && body.seed !== null) {
-      input.seed = body.seed
-    }
-
-    const output = await replicate.run("black-forest-labs/flux-schnell", { input })
-
-    // Increment counter after successful generation
-    if (hostId) {
-      const { error: statsError } = await supabaseAdmin.rpc('increment_generation_count', {
-        p_user_id: hostId
-      })
-      if (statsError) {
-        console.error('Failed to increment generation count:', statsError)
+      const input: Record<string, unknown> = {
+        prompt: body.prompt,
+        go_fast: true,
+        megapixels: "1",
+        num_outputs: 1,
+        aspect_ratio: "1:1",
+        output_format: "webp",
+        output_quality: 80,
+        num_inference_steps: 4,
       }
+
+      if (body.seed !== undefined && body.seed !== null) {
+        input.seed = body.seed
+      }
+
+      const result = await replicate.run("black-forest-labs/flux-schnell", { input })
+      const replicateUrl = Array.isArray(result) ? result[0] : result
+      if (typeof replicateUrl !== 'string') throw new Error('No image returned')
+
+      // Copy into our own bucket with the service role. Clients have no upload
+      // access to game-images, so everything that can reach the party screen
+      // was produced by this function. It also outlives Replicate's ~1 hour
+      // delivery URLs (avatars were previously saved as Replicate links).
+      const imageResp = await fetch(replicateUrl)
+      if (!imageResp.ok) throw new Error('Could not download generated image')
+      const bytes = new Uint8Array(await imageResp.arrayBuffer())
+      const path = `generated/${body.roomId}/${crypto.randomUUID()}.webp`
+      const { error: uploadError } = await supabaseAdmin.storage
+        .from('game-images')
+        .upload(path, bytes, { contentType: 'image/webp' })
+      if (uploadError) throw uploadError
+
+      output = supabaseAdmin.storage.from('game-images').getPublicUrl(path).data.publicUrl
+    } catch (genError) {
+      const { error: refundError } = await supabaseAdmin.rpc('refund_generation_credit', { p_user_id: hostId })
+      if (refundError) console.error('Failed to refund generation credit:', refundError)
+      throw genError
     }
 
     return new Response(
